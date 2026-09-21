@@ -3,9 +3,9 @@
 A personal Android app that wraps [Archive of Our Own](https://archiveofourown.org) so I can browse and sign in
 in-app, download whole works as EPUBs, read them offline, and resume exactly where I left off.
 
-> **Status:** early development. The app currently opens AO3 in an in-app browser where you can sign in and
-> browse; downloading and reading aren't built yet. See [HANDOFF.md](HANDOFF.md) for the goals, constraints and
-> build plan.
+> **Status:** early development. The app opens AO3 in an in-app browser where you can sign in and browse, and can
+> download a single work as an EPUB; there's no library or reader yet. See [HANDOFF.md](HANDOFF.md) for the goals,
+> constraints and build plan.
 
 ## What works today
 
@@ -14,6 +14,9 @@ in-app, download whole works as EPUBs, read them offline, and resume exactly whe
   cookies persist.
 - Navigation stays on AO3: links to other sites open in the system browser.
 - A retry screen is shown when a page fails to load (for example, when offline).
+- On a work page, a temporary **Download EPUB** button saves the whole work (all chapters) to the app's private
+  storage, reusing the browser's session cookies. Failures are reported by kind (bot check, rate limit, server
+  error, ...). It never retries on its own; the download queue will handle that later.
 - Tested on a physical Android device. On an emulator, AO3's Cloudflare bot check may block the page, so a real
   device on a normal connection is recommended for testing.
 
@@ -24,7 +27,7 @@ Progress against the phased plan in [HANDOFF.md](HANDOFF.md):
 **Phase 1: foundation and the core loop**
 - [x] 1. App skeleton and signed release build
 - [x] 2. WebView browsing and sign-in
-- [ ] 3. Single-work EPUB download using the shared WebView cookies
+- [x] 3. Single-work EPUB download using the shared WebView cookies
 - [ ] 4. Library (Room)
 - [ ] 5. Reader with progress tracking (Readium)
 
@@ -45,7 +48,8 @@ Our Own (AO3) or the Organization for Transformative Works (OTW). "Archive of Ou
 respective owners.
 
 It is built for **personal use** on my own device. By design it uses AO3's normal web pages and official download
-links, makes **one request per work** (the EPUB bundles every chapter), runs downloads **sequentially with delays**,
+links, makes **one download per work** (the EPUB bundles every chapter, so it takes a single work-page load to find the
+link plus one file request), runs downloads **sequentially with delays**,
 and honors `Retry-After` on rate limiting. It does not bulk-crawl, scrape chapter by chapter, or download in
 parallel, and contributions that add such behavior won't be accepted. If you use or fork this, you are responsible
 for following [AO3's Terms of Service](https://archiveofourown.org/tos) and respecting the authors whose work you

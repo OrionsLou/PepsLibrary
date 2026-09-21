@@ -31,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,6 +39,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import app.pepslibrary.ao3.Ao3
+import app.pepslibrary.download.DownloadResult
+import app.pepslibrary.download.EpubDownloader
+import app.pepslibrary.network.Ao3Http
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 
 private const val TAG = "PepsLibrary"
 
@@ -48,17 +56,27 @@ fun BrowseScreen(modifier: Modifier = Modifier) {
     var progress by remember { mutableIntStateOf(0) }
     var canGoBack by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var currentUrl by remember { mutableStateOf<String?>(null) }
+    var downloadStatus by remember { mutableStateOf<String?>(null) }
+    var downloading by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     val webView = remember {
         createWebView(
             context = context,
             onProgress = { progress = it },
-            onHistoryChanged = { canGoBack = it },
+            onHistoryChanged = { back, url -> canGoBack = back; currentUrl = url },
             onPageStarted = { error = null },
             onError = { error = it },
         ).also { it.loadUrl(Ao3.HOME_URL) }
     }
     DisposableEffect(webView) { onDispose { webView.destroy() } }
+
+    // The client must send the WebView's exact user-agent, so it is built from the WebView's own settings.
+    val downloader = remember {
+        EpubDownloader(Ao3Http.createClient(webView.settings.userAgentString), File(context.filesDir, "works"))
+    }
+    val workId = Ao3.workIdFromUrl(currentUrl)
 
     BackHandler(enabled = canGoBack) { webView.goBack() }
 
@@ -72,8 +90,47 @@ fun BrowseScreen(modifier: Modifier = Modifier) {
             )
         }
 
+        // Temporary phase 1 scaffold: step 6 replaces this with buttons injected into AO3's own pages.
+        if (workId != null) {
+            DownloadBar(
+                status = downloadStatus,
+                enabled = !downloading,
+                onDownload = {
+                    downloading = true
+                    downloadStatus = "Downloading work $workId..."
+                    scope.launch {
+                        val result = withContext(Dispatchers.IO) { downloader.download(workId) }
+                        downloading = false
+                        downloadStatus = describe(result)
+                    }
+                },
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        }
+
         error?.let { message ->
             ErrorOverlay(message = message, onRetry = { error = null; webView.reload() })
+        }
+    }
+}
+
+private fun describe(result: DownloadResult): String = when (result) {
+    is DownloadResult.Success -> {
+        Log.i(TAG, "Saved ${result.file} (${result.bytes} bytes) from ${result.epubUrl}")
+        "Saved ${result.file.name} (${result.bytes / 1024} KB)"
+    }
+    is DownloadResult.Failure -> {
+        Log.w(TAG, "Download failed: ${result.kind}: ${result.message}")
+        "${result.kind}: ${result.message}"
+    }
+}
+
+@Composable
+private fun DownloadBar(status: String?, enabled: Boolean, onDownload: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(modifier = modifier.fillMaxWidth(), tonalElevation = 6.dp) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = onDownload, enabled = enabled) { Text("Download EPUB") }
+            status?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
         }
     }
 }
@@ -97,7 +154,7 @@ private fun ErrorOverlay(message: String, onRetry: () -> Unit) {
 private fun createWebView(
     context: Context,
     onProgress: (Int) -> Unit,
-    onHistoryChanged: (canGoBack: Boolean) -> Unit,
+    onHistoryChanged: (canGoBack: Boolean, url: String?) -> Unit,
     onPageStarted: () -> Unit,
     onError: (String) -> Unit,
 ): WebView = WebView(context).apply {
@@ -133,7 +190,7 @@ private fun createWebView(
         }
 
         override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) =
-            onHistoryChanged(view.canGoBack())
+            onHistoryChanged(view.canGoBack(), url)
 
         override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
             if (request.isForMainFrame) onError(error.description.toString())
