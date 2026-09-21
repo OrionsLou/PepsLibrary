@@ -59,6 +59,7 @@ The order gets a working read-offline loop early, then adds convenience on top. 
 1. **App skeleton.** Compose project, signing keystore, release build that installs on my phone via adb or APK.
 2. **WebView browsing and sign-in.** AO3 loads in a WebView and I can log in. Session cookies persist.
 3. **Single-work EPUB download.** Given a work ID (hardcode one to start), fetch the EPUB with the shared WebView cookies and save it to app storage. This proves the cookie handoff.
+3a. **Browser navigation footer.** *(Inserted after step 3.)* AO3 and Cloudflare intermittently serve error or bot-check pages. A sticky footer under the WebView with back, forward and refresh buttons lets me retry or navigate without leaving the app. Back and forward follow the WebView history and are disabled at either end.
 4. **Library (Room).** Store per-work metadata (ID, title, author, file path, download date) and show a list of downloaded works.
 5. **Reader with progress tracking.** Open the EPUB in Readium, save the locator on pause/close, and restore it on open. **This is the MVP:** download, read offline, resume.
 
@@ -73,6 +74,7 @@ The order gets a working read-offline loop early, then adds convenience on top. 
 9. **WIP updates.** Re-download the EPUB to pick up new chapters while keeping the reading position.
 10. **Library management.** Delete works, sort/filter, resume-reading shortcut, storage usage.
 11. **Hardening.** Cookies in encrypted storage, sensible error and offline states, GitHub Releases plus Obtainium for updates.
+12. **UI polish and aesthetic tweaks.** *(Added after hardening.)* A visual pass over the whole app once the features are in place: consistent theming (including dark mode), spacing and typography, app icon and splash, empty and loading states, and replacing the temporary scaffolding UI (such as the Download EPUB bar) with a finished design.
 
 ## 6. Suggested architecture
 
