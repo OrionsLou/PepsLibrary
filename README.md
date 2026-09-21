@@ -3,8 +3,40 @@
 A personal Android app that wraps [Archive of Our Own](https://archiveofourown.org) so I can browse and sign in
 in-app, download whole works as EPUBs, read them offline, and resume exactly where I left off.
 
-> **Status:** early development. Phase 1 step 1 (app skeleton with a signed release build) is done. See
-> [HANDOFF.md](HANDOFF.md) for the goals, constraints and build plan.
+> **Status:** early development. The app currently opens AO3 in an in-app browser where you can sign in and
+> browse; downloading and reading aren't built yet. See [HANDOFF.md](HANDOFF.md) for the goals, constraints and
+> build plan.
+
+## What works today
+
+- Signed release build that installs on a device by sideloading.
+- AO3 loads in a `WebView` with the site's full search, filters and bookmarks. Signing in works and the session
+  cookies persist.
+- Navigation stays on AO3: links to other sites open in the system browser.
+- A retry screen is shown when a page fails to load (for example, when offline).
+- Tested on a physical Android device. On an emulator, AO3's Cloudflare bot check may block the page, so a real
+  device on a normal connection is recommended for testing.
+
+## Roadmap
+
+Progress against the phased plan in [HANDOFF.md](HANDOFF.md):
+
+**Phase 1: foundation and the core loop**
+- [x] 1. App skeleton and signed release build
+- [x] 2. WebView browsing and sign-in
+- [ ] 3. Single-work EPUB download using the shared WebView cookies
+- [ ] 4. Library (Room)
+- [ ] 5. Reader with progress tracking (Readium)
+
+**Phase 2: making it pleasant**
+- [ ] 6. Injected download buttons
+- [ ] 7. Download queue
+- [ ] 8. "Already downloaded" badges
+
+**Phase 3: polish**
+- [ ] 9. WIP updates
+- [ ] 10. Library management
+- [ ] 11. Hardening
 
 ## Disclaimer
 
