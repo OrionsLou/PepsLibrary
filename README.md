@@ -81,6 +81,18 @@ $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
 Output: `app/build/outputs/apk/release/app-release.apk`. Install with
 `adb install -r app/build/outputs/apk/release/app-release.apk`.
 
+## Testing
+
+Unit tests are plain JUnit 4 tests under `app/src/test/` and run on the JVM, with no device or emulator needed.
+Use the same `JAVA_HOME` as above:
+
+```powershell
+.\gradlew.bat testDebugUnitTest
+```
+
+`.\gradlew.bat test` runs the debug and release variants. HTML results are written to
+`app/build/reports/tests/testDebugUnitTest/index.html`.
+
 ## Release signing
 
 The keystore and its passwords are **never committed**, and are kept outside the repo (and outside OneDrive).
