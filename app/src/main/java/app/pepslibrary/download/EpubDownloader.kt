@@ -1,6 +1,7 @@
 package app.pepslibrary.download
 
 import app.pepslibrary.ao3.Ao3
+import app.pepslibrary.ao3.WorkMetadata
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -16,7 +17,15 @@ import java.nio.file.StandardCopyOption
 enum class FailureKind { BOT_CHECK, RATE_LIMITED, SERVER_ERROR, NO_EPUB_LINK, NOT_AN_EPUB, HTTP_ERROR, NETWORK }
 
 sealed interface DownloadResult {
-    data class Success(val file: File, val bytes: Long, val epubUrl: String) : DownloadResult
+    data class Success(
+        val file: File,
+        val bytes: Long,
+        val epubUrl: String,
+        /** Read from the work page we already fetched to find the link; empty fields if AO3's markup changed. */
+        val metadata: WorkMetadata,
+        /** AO3's `updated_at` for this version of the work, from the download link. */
+        val sourceUpdatedAt: Long?,
+    ) : DownloadResult
 
     data class Failure(
         val kind: FailureKind,
@@ -55,11 +64,11 @@ class EpubDownloader(private val client: OkHttpClient, private val worksDir: Fil
         val epubRequest = Request.Builder().url(epubUrl).header("Referer", pageUrl).build()
         return client.newCall(epubRequest).execute().use { response ->
             failureFor(response, "EPUB file")?.let { return it }
-            save(workId, epubUrl, response)
+            save(workId, epubUrl, Ao3.parseWorkMetadata(html), response)
         }
     }
 
-    private fun save(workId: Long, epubUrl: String, response: Response): DownloadResult {
+    private fun save(workId: Long, epubUrl: String, metadata: WorkMetadata, response: Response): DownloadResult {
         worksDir.mkdirs()
         val target = File(worksDir, "$workId.epub")
         val part = File(worksDir, "$workId.epub.part")
@@ -72,7 +81,13 @@ class EpubDownloader(private val client: OkHttpClient, private val worksDir: Fil
                 )
             }
             Files.move(part.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE)
-            return DownloadResult.Success(target, target.length(), epubUrl)
+            return DownloadResult.Success(
+                file = target,
+                bytes = target.length(),
+                epubUrl = epubUrl,
+                metadata = metadata,
+                sourceUpdatedAt = Ao3.updatedAtFromDownloadUrl(epubUrl),
+            )
         } finally {
             part.delete() // gone already after a successful move; cleans up any partial or rejected download
         }

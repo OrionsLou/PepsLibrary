@@ -39,9 +39,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import app.pepslibrary.ao3.Ao3
+import app.pepslibrary.data.LibraryRepository
 import app.pepslibrary.download.DownloadResult
 import app.pepslibrary.download.EpubDownloader
 import app.pepslibrary.network.Ao3Http
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -51,7 +53,7 @@ private const val TAG = "PepsLibrary"
 
 /** Hosts AO3 in a WebView. Sign-in happens on the site itself; the WebView's CookieManager owns the session. */
 @Composable
-fun BrowseScreen(modifier: Modifier = Modifier) {
+fun BrowseScreen(repository: LibraryRepository, onOpenLibrary: () -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     var progress by remember { mutableIntStateOf(0) }
     var canGoBack by remember { mutableStateOf(false) }
@@ -109,8 +111,19 @@ fun BrowseScreen(modifier: Modifier = Modifier) {
                         downloadStatus = "Downloading work $workId..."
                         scope.launch {
                             val result = withContext(Dispatchers.IO) { downloader.download(workId) }
+                            downloadStatus = when (result) {
+                                is DownloadResult.Success -> try {
+                                    withContext(Dispatchers.IO) { repository.saveDownload(workId, result) }
+                                    describe(result)
+                                } catch (e: CancellationException) {
+                                    throw e
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "Saved ${result.file} but could not record it", e)
+                                    "Saved ${result.file.name} but couldn't add it to the library: ${e.message}"
+                                }
+                                is DownloadResult.Failure -> describe(result)
+                            }
                             downloading = false
-                            downloadStatus = describe(result)
                         }
                     },
                     modifier = Modifier.align(Alignment.BottomCenter),
@@ -128,6 +141,7 @@ fun BrowseScreen(modifier: Modifier = Modifier) {
             onBack = ::goBack,
             onForward = ::goForward,
             onRefresh = ::refresh,
+            onOpenLibrary = onOpenLibrary,
         )
     }
 }
@@ -135,7 +149,7 @@ fun BrowseScreen(modifier: Modifier = Modifier) {
 private fun describe(result: DownloadResult): String = when (result) {
     is DownloadResult.Success -> {
         Log.i(TAG, "Saved ${result.file} (${result.bytes} bytes) from ${result.epubUrl}")
-        "Saved ${result.file.name} (${result.bytes / 1024} KB)"
+        "Saved \"${result.metadata.title ?: result.file.name}\" (${result.bytes / 1024} KB) to your library"
     }
     is DownloadResult.Failure -> {
         Log.w(TAG, "Download failed: ${result.kind}: ${result.message}")

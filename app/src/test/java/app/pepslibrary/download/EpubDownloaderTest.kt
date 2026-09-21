@@ -84,6 +84,38 @@ class EpubDownloaderTest {
     }
 
     @Test
+    fun successCarriesTheUpdatedAtFromTheDownloadLink() {
+        val result = downloader(::normalSite).download(workId) as DownloadResult.Success
+        assertEquals(1L, result.sourceUpdatedAt) // the page's link ends in ?updated_at=1
+    }
+
+    @Test
+    fun successCarriesTheMetadataParsedFromTheWorkPageWeAlreadyFetched() {
+        val samplePage = checkNotNull(javaClass.getResource("/ao3/work_page_sample.html")).readText()
+        val result = downloader { request ->
+            when {
+                request.url.encodedPath.startsWith("/works/") -> request.reply(body = samplePage.toByteArray())
+                request.url.encodedPath.endsWith(".epub") -> request.reply(body = epubBytes, type = "application/epub+zip")
+                else -> request.reply(code = 404)
+            }
+        }.download(workId) as DownloadResult.Success
+
+        assertEquals("Sample Work Title", result.metadata.title)
+        assertEquals(listOf("SampleAuthor", "Second Author"), result.metadata.authors)
+        assertEquals(12345, result.metadata.words)
+        assertEquals(1700000000L, result.sourceUpdatedAt)
+        assertEquals("no extra request just for metadata", 2, requests.size)
+    }
+
+    @Test
+    fun aPageWeCannotReadMetadataFromStillDownloads() {
+        // The default test page has an EPUB link but none of AO3's metadata markup.
+        val result = downloader(::normalSite).download(workId) as DownloadResult.Success
+        assertNull(result.metadata.title)
+        assertTrue(result.file.exists())
+    }
+
+    @Test
     fun makesExactlyTwoRequestsInOrder_workPageThenEpub_withReferer() {
         downloader(::normalSite).download(workId)
 

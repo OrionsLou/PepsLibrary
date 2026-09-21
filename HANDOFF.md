@@ -76,6 +76,20 @@ The order gets a working read-offline loop early, then adds convenience on top. 
 11. **Hardening.** Cookies in encrypted storage, sensible error and offline states, GitHub Releases plus Obtainium for updates.
 12. **UI polish and aesthetic tweaks.** *(Added after hardening.)* A visual pass over the whole app once the features are in place: consistent theming (including dark mode), spacing and typography, app icon and splash, empty and loading states, and replacing the temporary scaffolding UI (such as the Download EPUB bar) with a finished design.
 
+### Notes to revisit in Phase 3
+
+Observations from hands-on testing of the Phase 1 build, to fold into steps 11 and 12 (or into step 7 if the download queue gets there first, since it already promises progress and failure display).
+
+1. **Cancel or abort a download in progress** *(fits step 11, hardening; overlaps step 7)*. Right after tapping Download EPUB the button stays grey until the request times out, and there is no way out. Wanted: a Cancel control while a download runs, and a shorter, more honest failure path when the network stalls.
+   - Today's client allows a 20 s connect and 60 s read timeout per request, and a download makes two requests, so a stall can take well over a minute to surface.
+   - `EpubDownloader.download` is blocking. To cancel it, keep a handle on the in-flight OkHttp `Call` and call `cancel()` (or wrap the call so coroutine cancellation does it), and make sure a cancelled download leaves no `.part` file behind. It already cleans up on failure; add a test for cancellation.
+   - Decide what timeouts feel right. AO3 can take a while to build an EPUB for a long work, so a short read timeout would cause false failures.
+2. **Make page loading obvious** *(fits step 12, UI polish)*. The thin progress bar at the top of the browser is easy to miss. Wanted: a clearer indicator that a page is loading, for example a more prominent bar or spinner, and the refresh button reflecting the loading state (a stop control while loading).
+3. **Show download progress** *(fits step 12, and step 7 for the queue)*. Wanted: visible progress while a work downloads instead of only a status line at the end.
+   - Read `Content-Length` from the EPUB response for a determinate bar, and fall back to an indeterminate one when it is absent.
+   - There may be a quiet gap before the first byte while AO3 builds the file, so show a "waiting for AO3" state distinct from "downloading", and distinguish the work-page load from the file transfer.
+   - Report progress from the downloader through a callback so the queue (step 7) and the UI can share it.
+
 ## 6. Suggested architecture
 
 - **Layers:** UI (Compose screens), data (Room, download storage), network (OkHttp with WebView cookie jar), and an isolated AO3 "adapter" layer holding all selectors, injected JS, and parsing.

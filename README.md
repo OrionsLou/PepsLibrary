@@ -3,9 +3,9 @@
 A personal Android app that wraps [Archive of Our Own](https://archiveofourown.org) so I can browse and sign in
 in-app, download whole works as EPUBs, read them offline, and resume exactly where I left off.
 
-> **Status:** early development. The app opens AO3 in an in-app browser where you can sign in and browse, and can
-> download a single work as an EPUB; there's no library or reader yet. See [HANDOFF.md](HANDOFF.md) for the goals,
-> constraints and build plan.
+> **Status:** early development. The app opens AO3 in an in-app browser where you can sign in and browse, download a
+> single work as an EPUB, and see your downloads in a library list; there's no reader yet. See
+> [HANDOFF.md](HANDOFF.md) for the goals, constraints and build plan.
 
 ## What works today
 
@@ -20,6 +20,12 @@ in-app, download whole works as EPUBs, read them offline, and resume exactly whe
 - On a work page, a temporary **Download EPUB** button saves the whole work (all chapters) to the app's private
   storage, reusing the browser's session cookies. Failures are reported by kind (bot check, rate limit, server
   error, ...). It never retries on its own; the download queue will handle that later.
+- Each download is recorded in a local Room database, using metadata read from the work page that was already
+  fetched (no extra request): title, authors, summary, rating, warnings, categories, fandoms, relationships,
+  characters, tags, language, word and chapter counts, dates, and AO3's `updated_at` for later update checks.
+- The **Library** button in the footer opens a list of downloaded works (title, authors, fandoms, word and chapter
+  counts with a Complete/In progress status, summary and download date). It slides over the browser, so the page
+  and history you were on are kept. Downloading a work again replaces its entry.
 - Tested on a physical Android device. On an emulator, AO3's Cloudflare bot check may block the page, so a real
   device on a normal connection is recommended for testing.
 
@@ -32,7 +38,7 @@ Progress against the phased plan in [HANDOFF.md](HANDOFF.md):
 - [x] 2. WebView browsing and sign-in
 - [x] 3. Single-work EPUB download using the shared WebView cookies
 - [x] 3a. Browser navigation footer (back, forward, refresh), added to work around intermittent Cloudflare errors
-- [ ] 4. Library (Room)
+- [x] 4. Library (Room)
 - [ ] 5. Reader with progress tracking (Readium)
 
 **Phase 2: making it pleasant**
