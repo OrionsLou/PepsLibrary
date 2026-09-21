@@ -14,6 +14,9 @@ in-app, download whole works as EPUBs, read them offline, and resume exactly whe
   cookies persist.
 - Navigation stays on AO3: links to other sites open in the system browser.
 - A retry screen is shown when a page fails to load (for example, when offline).
+- A sticky footer under the browser has back, forward and refresh buttons. Back and forward follow the browsing
+  history and are disabled at either end; refresh is the way out of an intermittent Cloudflare error or bot-check
+  page, and stays available on the error screen.
 - On a work page, a temporary **Download EPUB** button saves the whole work (all chapters) to the app's private
   storage, reusing the browser's session cookies. Failures are reported by kind (bot check, rate limit, server
   error, ...). It never retries on its own; the download queue will handle that later.
@@ -28,6 +31,7 @@ Progress against the phased plan in [HANDOFF.md](HANDOFF.md):
 - [x] 1. App skeleton and signed release build
 - [x] 2. WebView browsing and sign-in
 - [x] 3. Single-work EPUB download using the shared WebView cookies
+- [x] 3a. Browser navigation footer (back, forward, refresh), added to work around intermittent Cloudflare errors
 - [ ] 4. Library (Room)
 - [ ] 5. Reader with progress tracking (Readium)
 
@@ -40,6 +44,7 @@ Progress against the phased plan in [HANDOFF.md](HANDOFF.md):
 - [ ] 9. WIP updates
 - [ ] 10. Library management
 - [ ] 11. Hardening
+- [ ] 12. UI polish and aesthetic tweaks
 
 ## Disclaimer
 

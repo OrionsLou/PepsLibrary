@@ -55,6 +55,7 @@ fun BrowseScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     var progress by remember { mutableIntStateOf(0) }
     var canGoBack by remember { mutableStateOf(false) }
+    var canGoForward by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var currentUrl by remember { mutableStateOf<String?>(null) }
     var downloadStatus by remember { mutableStateOf<String?>(null) }
@@ -65,7 +66,7 @@ fun BrowseScreen(modifier: Modifier = Modifier) {
         createWebView(
             context = context,
             onProgress = { progress = it },
-            onHistoryChanged = { back, url -> canGoBack = back; currentUrl = url },
+            onHistoryChanged = { back, forward, url -> canGoBack = back; canGoForward = forward; currentUrl = url },
             onPageStarted = { error = null },
             onError = { error = it },
         ).also { it.loadUrl(Ao3.HOME_URL) }
@@ -78,39 +79,56 @@ fun BrowseScreen(modifier: Modifier = Modifier) {
     }
     val workId = Ao3.workIdFromUrl(currentUrl)
 
-    BackHandler(enabled = canGoBack) { webView.goBack() }
+    fun goBack() { error = null; webView.goBack() }
+    fun goForward() { error = null; webView.goForward() }
+    fun refresh() {
+        error = null
+        refreshTarget(webView.url)?.let { webView.loadUrl(it) } ?: webView.reload()
+    }
 
-    Box(modifier.fillMaxSize()) {
-        AndroidView(factory = { webView }, modifier = Modifier.fillMaxSize())
+    BackHandler(enabled = canGoBack) { goBack() }
 
-        if (progress in 1..99) {
-            LinearProgressIndicator(
-                progress = { progress / 100f },
-                modifier = Modifier.fillMaxWidth().align(Alignment.TopStart),
-            )
+    Column(modifier.fillMaxSize()) {
+        Box(Modifier.fillMaxWidth().weight(1f)) {
+            AndroidView(factory = { webView }, modifier = Modifier.fillMaxSize())
+
+            if (progress in 1..99) {
+                LinearProgressIndicator(
+                    progress = { progress / 100f },
+                    modifier = Modifier.fillMaxWidth().align(Alignment.TopStart),
+                )
+            }
+
+            // Temporary phase 1 scaffold: step 6 replaces this with buttons injected into AO3's own pages.
+            if (workId != null) {
+                DownloadBar(
+                    status = downloadStatus,
+                    enabled = !downloading,
+                    onDownload = {
+                        downloading = true
+                        downloadStatus = "Downloading work $workId..."
+                        scope.launch {
+                            val result = withContext(Dispatchers.IO) { downloader.download(workId) }
+                            downloading = false
+                            downloadStatus = describe(result)
+                        }
+                    },
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                )
+            }
+
+            error?.let { message ->
+                ErrorOverlay(message = message, onRetry = ::refresh)
+            }
         }
 
-        // Temporary phase 1 scaffold: step 6 replaces this with buttons injected into AO3's own pages.
-        if (workId != null) {
-            DownloadBar(
-                status = downloadStatus,
-                enabled = !downloading,
-                onDownload = {
-                    downloading = true
-                    downloadStatus = "Downloading work $workId..."
-                    scope.launch {
-                        val result = withContext(Dispatchers.IO) { downloader.download(workId) }
-                        downloading = false
-                        downloadStatus = describe(result)
-                    }
-                },
-                modifier = Modifier.align(Alignment.BottomCenter),
-            )
-        }
-
-        error?.let { message ->
-            ErrorOverlay(message = message, onRetry = { error = null; webView.reload() })
-        }
+        BrowserToolbar(
+            canGoBack = canGoBack,
+            canGoForward = canGoForward,
+            onBack = ::goBack,
+            onForward = ::goForward,
+            onRefresh = ::refresh,
+        )
     }
 }
 
@@ -154,7 +172,7 @@ private fun ErrorOverlay(message: String, onRetry: () -> Unit) {
 private fun createWebView(
     context: Context,
     onProgress: (Int) -> Unit,
-    onHistoryChanged: (canGoBack: Boolean, url: String?) -> Unit,
+    onHistoryChanged: (canGoBack: Boolean, canGoForward: Boolean, url: String?) -> Unit,
     onPageStarted: () -> Unit,
     onError: (String) -> Unit,
 ): WebView = WebView(context).apply {
@@ -190,7 +208,7 @@ private fun createWebView(
         }
 
         override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) =
-            onHistoryChanged(view.canGoBack(), url)
+            onHistoryChanged(view.canGoBack(), view.canGoForward(), url)
 
         override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
             if (request.isForMainFrame) onError(error.description.toString())
