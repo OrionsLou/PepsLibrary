@@ -117,7 +117,7 @@ private fun createWebView(
     }
     webViewClient = object : WebViewClient() {
         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-            if (!request.isForMainFrame || Ao3.isAo3Url(request.url)) return false
+            if (!request.isForMainFrame || Ao3.isAo3Url(request.url.toString())) return false
             openExternally(view.context, request.url)
             return true
         }
@@ -142,7 +142,7 @@ private fun createWebView(
 }
 
 private fun openExternally(context: Context, uri: Uri) {
-    if (uri.scheme != "https" && uri.scheme != "http") return
+    if (!isOpenableExternally(uri.scheme)) return
     try {
         context.startActivity(Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     } catch (_: ActivityNotFoundException) {
