@@ -2,6 +2,17 @@ package app.pepslibrary.ui
 
 import app.pepslibrary.data.WorkEntity
 import java.util.Locale
+import kotlin.math.roundToInt
+
+/**
+ * How far into a work the reader is, from the saved fraction (0.0 to 1.0, or null if never opened or unknown):
+ * "Not started", "42% read" or "Finished".
+ */
+internal fun readingProgressLabel(fraction: Double?): String = when {
+    fraction == null || fraction < 0.005 -> "Not started"
+    fraction >= 0.995 -> "Finished"
+    else -> "${(fraction * 100).roundToInt()}% read"
+}
 
 /** "by A, B", or null when the work has no known author. */
 internal fun workByline(work: WorkEntity): String? =

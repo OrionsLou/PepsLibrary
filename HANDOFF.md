@@ -32,7 +32,7 @@ A personal Android app that wraps https://archiveofourown.org (AO3) so I can:
 | HTTP | OkHttp (with cookies from the WebView `CookieManager`) |
 | HTML parsing | Jsoup (used sparingly, e.g. to find the EPUB link on a work page) |
 | Local DB | Room |
-| EPUB reader | Readium Kotlin toolkit **[verify current version and setup]** |
+| EPUB reader | Readium Kotlin toolkit **3.1.2**, pinned. *Verified 2026-09-21:* the newest release this project's toolchain accepts (compileSdk 35, AGP 8.7.3, Kotlin 2.0.21; Kotlin reads metadata one minor version ahead). 3.2.0 and later need newer Kotlin and compileSdk, i.e. an AGP, Android Studio and SDK upgrade. Setup: `readium-shared`, `readium-streamer` and `readium-navigator` from Maven Central, core library desugaring, and `androidx.fragment` declared explicitly (Readium lists it runtime-only). No PDF adapter. |
 | Secure storage | Android Keystore / EncryptedSharedPreferences equivalent (Phase 3) |
 | Build / release | Gradle, signed release APK |
 
@@ -62,6 +62,16 @@ The order gets a working read-offline loop early, then adds convenience on top. 
 3a. **Browser navigation footer.** *(Inserted after step 3.)* AO3 and Cloudflare intermittently serve error or bot-check pages. A sticky footer under the WebView with back, forward and refresh buttons lets me retry or navigate without leaving the app. Back and forward follow the WebView history and are disabled at either end.
 4. **Library (Room).** Store per-work metadata (ID, title, author, file path, download date) and show a list of downloaded works.
 5. **Reader with progress tracking.** Open the EPUB in Readium, save the locator on pause/close, and restore it on open. **This is the MVP:** download, read offline, resume.
+5a. **Update dependencies and toolchain.** *(Inserted after step 5.)* Bring the build toolchain and libraries up to date as one deliberate chore, on its own branch, separate from feature work. Motivation: the toolchain is about a year behind the libraries it now pulls in. Readium's newer AndroidX dependencies ship lint checks that crash this AGP's lint (worked around by disabling `NullSafeMutableLiveData` in `app/build.gradle.kts`), and every Readium release after 3.1.2 needs a newer Kotlin and compileSdk.
+   - **Scope, roughly in this order** (verify each version pairing against its compatibility table instead of assuming; do one layer at a time, and build, run the unit tests and try the app on the emulator before the next):
+     1. **Android Studio** (currently Ladybug 2024.2, matched to AGP 8.7). Updating it is a manual step for me; a newer AGP likely needs a newer Studio.
+     2. **Gradle wrapper and Android Gradle Plugin** (currently Gradle 8.9, AGP 8.7.3). Find the AGP release that fixes the lint crash and confirm its required Gradle version. Generate the wrapper in an empty directory, because `gradle wrapper` evaluates the build files and fails on a version mismatch.
+     3. **Kotlin, KSP and the Compose compiler plugin** (currently 2.0.21 and KSP 2.0.21-1.0.28). These move together, so pick the KSP release that matches the Kotlin version.
+     4. **compileSdk and targetSdk** (currently 35), including installing the matching SDK platform.
+     5. **Libraries:** the Compose BOM (2024.10.01), core-ktx, activity-compose, Room (2.6.1; the schema and migration must keep working), OkHttp (4.12.0; 5.x is a bigger change), Jsoup, `desugar_jdk_libs`, AndroidX Fragment and JUnit.
+     6. **Readium** (pinned at 3.1.2). Decide how far to go. The 3.2 to 3.4 releases need progressively newer Kotlin, compileSdk and Gradle, and 3.4.0 raises minSdk to 24 and changes PDFium defaults (irrelevant here, as there is no PDF adapter).
+   - **Also in this step:** remove the lint workaround once the crash is gone, and check whether R8 shrinking can go in (this is a good moment to look at keep rules for Readium, which currently make the release APK about 13 MB).
+   - **Done when:** the workaround is removed, all unit tests pass, the release build is signed and installs, the Room migration path still works on an existing database, and the reader and downloads pass a phone test. Record the versions chosen and why in this file, as done for Readium above.
 
 ### Phase 2: Making it pleasant
 

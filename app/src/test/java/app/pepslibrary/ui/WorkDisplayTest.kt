@@ -57,6 +57,28 @@ class WorkDisplayTest {
     }
 
     @Test
+    fun aWorkNeverOpenedIsNotStarted() {
+        assertEquals("Not started", readingProgressLabel(null))
+        assertEquals("Not started", readingProgressLabel(0.0))
+        assertEquals("Not started", readingProgressLabel(0.004))
+    }
+
+    @Test
+    fun aWorkPartWayThroughShowsAPercentage() {
+        assertEquals("1% read", readingProgressLabel(0.005))
+        assertEquals("42% read", readingProgressLabel(0.42))
+        assertEquals("42% read", readingProgressLabel(0.4249))
+        assertEquals("43% read", readingProgressLabel(0.425))
+        assertEquals("99% read", readingProgressLabel(0.99))
+    }
+
+    @Test
+    fun aWorkReadToTheEndIsFinished() {
+        assertEquals("Finished", readingProgressLabel(0.995))
+        assertEquals("Finished", readingProgressLabel(1.0))
+    }
+
+    @Test
     fun bylineJoinsAuthorsAndIsNullWithoutAny() {
         assertEquals("by A", workByline(work(authors = listOf("A"))))
         assertEquals("by A, B", workByline(work(authors = listOf("A", "B"))))

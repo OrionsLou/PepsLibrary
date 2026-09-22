@@ -35,7 +35,14 @@ import java.util.Date
  * on) stays alive underneath.
  */
 @Composable
-fun LibraryScreen(works: List<WorkEntity>, onBack: () -> Unit, modifier: Modifier = Modifier) {
+fun LibraryScreen(
+    works: List<WorkEntity>,
+    /** Fraction read (0.0 to 1.0) for works that have a saved reading position. */
+    progress: Map<Long, Double?>,
+    onOpenWork: (workId: Long) -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     BackHandler(onBack = onBack)
 
     // The empty pointerInput swallows touches so they don't fall through to the WebView underneath.
@@ -65,7 +72,9 @@ fun LibraryScreen(works: List<WorkEntity>, onBack: () -> Unit, modifier: Modifie
                     contentPadding = PaddingValues(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(works, key = { it.workId }) { WorkCard(it) }
+                    items(works, key = { it.workId }) { work ->
+                        WorkCard(work, readingProgressLabel(progress[work.workId]), onClick = { onOpenWork(work.workId) })
+                    }
                 }
             }
         }
@@ -73,8 +82,8 @@ fun LibraryScreen(works: List<WorkEntity>, onBack: () -> Unit, modifier: Modifie
 }
 
 @Composable
-private fun WorkCard(work: WorkEntity) {
-    Card(Modifier.fillMaxWidth()) {
+private fun WorkCard(work: WorkEntity, progressLabel: String, onClick: () -> Unit) {
+    Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(work.title, style = MaterialTheme.typography.titleMedium)
             workByline(work)?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
@@ -89,6 +98,7 @@ private fun WorkCard(work: WorkEntity) {
             workStatsLine(work).takeIf { it.isNotEmpty() }?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall)
             }
+            Text(progressLabel, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             work.summary?.let {
                 Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 3, overflow = TextOverflow.Ellipsis)
             }
