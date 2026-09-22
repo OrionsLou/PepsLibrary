@@ -3,9 +3,9 @@
 A personal Android app that wraps [Archive of Our Own](https://archiveofourown.org) so I can browse and sign in
 in-app, download whole works as EPUBs, read them offline, and resume exactly where I left off.
 
-> **Status:** early development. The app opens AO3 in an in-app browser where you can sign in and browse, download a
-> single work as an EPUB, and see your downloads in a library list; there's no reader yet. See
-> [HANDOFF.md](HANDOFF.md) for the goals, constraints and build plan.
+> **Status:** early development, but the core loop works: browse and sign in to AO3, download a work as an EPUB,
+> read it offline, and pick up exactly where you left off. See [HANDOFF.md](HANDOFF.md) for the goals, constraints
+> and build plan.
 
 ## What works today
 
@@ -26,6 +26,12 @@ in-app, download whole works as EPUBs, read them offline, and resume exactly whe
 - The **Library** button in the footer opens a list of downloaded works (title, authors, fandoms, word and chapter
   counts with a Complete/In progress status, summary and download date). It slides over the browser, so the page
   and history you were on are kept. Downloading a work again replaces its entry.
+- Tapping a work in the library opens it in a **reader** built on the [Readium](https://readium.org) toolkit
+  (version 3.1.2): swipe or tap the page edges to turn pages, with the title and percent read in a top bar. The
+  reading position is saved (as a Readium locator, in Room) when you leave, when the app is stopped, and a second
+  after you stop turning pages, so even a killed app resumes at the same spot. Each library entry shows "Not
+  started", "42% read" or "Finished". Links inside a book open in the browser, never inside the reader. A missing
+  or damaged file gets a clear message instead of a crash.
 - Tested on a physical Android device. On an emulator, AO3's Cloudflare bot check may block the page, so a real
   device on a normal connection is recommended for testing.
 
@@ -39,7 +45,8 @@ Progress against the phased plan in [HANDOFF.md](HANDOFF.md):
 - [x] 3. Single-work EPUB download using the shared WebView cookies
 - [x] 3a. Browser navigation footer (back, forward, refresh), added to work around intermittent Cloudflare errors
 - [x] 4. Library (Room)
-- [ ] 5. Reader with progress tracking (Readium)
+- [x] 5. Reader with progress tracking (Readium)
+- [ ] 5a. Update dependencies and toolchain (Android Studio, AGP, Gradle, Kotlin, SDK, libraries)
 
 **Phase 2: making it pleasant**
 - [ ] 6. Injected download buttons

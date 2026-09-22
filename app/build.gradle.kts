@@ -50,12 +50,21 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // Required by the Readium toolkit.
+        isCoreLibraryDesugaringEnabled = true
     }
     kotlinOptions {
         jvmTarget = "17"
     }
     buildFeatures {
         compose = true
+    }
+    lint {
+        // Readium pulls in androidx.lifecycle 2.9, whose bundled lint check was built for a newer Kotlin analysis
+        // API than this AGP's lint has, and crashes the release lint run ("Found class KaCallableMemberCall, but
+        // interface was expected"). The check is about LiveData, which this app does not use. Remove this once AGP
+        // is upgraded.
+        disable += "NullSafeMutableLiveData"
     }
 }
 
@@ -75,6 +84,11 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
+    implementation(libs.readium.shared)
+    implementation(libs.readium.streamer)
+    implementation(libs.readium.navigator)
+    implementation(libs.androidx.fragment.ktx)
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
 
     testImplementation(libs.junit)
 }
