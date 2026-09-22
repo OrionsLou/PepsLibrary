@@ -73,6 +73,9 @@ parallel, and contributions that add such behavior won't be accepted. If you use
 for following [AO3's Terms of Service](https://archiveofourown.org/tos) and respecting the authors whose work you
 download.
 
+Downloaded works are not reviewed, scanned, or processed by the app, an AI agent, or any third party — they are
+written to the app's private on-device storage exactly as fetched from AO3.
+
 ## How this was built
 
 This project is built with an AI coding agent ([Claude Code](https://claude.com/claude-code)) working from a
