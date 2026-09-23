@@ -101,38 +101,37 @@ fun BrowseScreen(repository: LibraryRepository, onOpenLibrary: () -> Unit, modif
                 )
             }
 
-            // Temporary phase 1 scaffold: step 6 replaces this with buttons injected into AO3's own pages.
-            if (workId != null) {
-                DownloadBar(
-                    status = downloadStatus,
-                    enabled = !downloading,
-                    onDownload = {
-                        downloading = true
-                        downloadStatus = "Downloading work $workId..."
-                        scope.launch {
-                            val result = withContext(Dispatchers.IO) { downloader.download(workId) }
-                            downloadStatus = when (result) {
-                                is DownloadResult.Success -> try {
-                                    withContext(Dispatchers.IO) { repository.saveDownload(workId, result) }
-                                    describe(result)
-                                } catch (e: CancellationException) {
-                                    throw e
-                                } catch (e: Exception) {
-                                    Log.e(TAG, "Saved ${result.file} but could not record it", e)
-                                    "Saved ${result.file.name} but couldn't add it to the library: ${e.message}"
-                                }
-                                is DownloadResult.Failure -> describe(result)
-                            }
-                            downloading = false
-                        }
-                    },
-                    modifier = Modifier.align(Alignment.BottomCenter),
-                )
-            }
-
             error?.let { message ->
                 ErrorOverlay(message = message, onRetry = ::refresh)
             }
+        }
+
+        // Sits between the page and the footer rather than over the page, so AO3's own content is never covered.
+        if (workId != null) {
+            DownloadBar(
+                status = downloadStatus,
+                enabled = !downloading,
+                onDownload = {
+                    downloading = true
+                    downloadStatus = "Downloading work $workId..."
+                    scope.launch {
+                        val result = withContext(Dispatchers.IO) { downloader.download(workId) }
+                        downloadStatus = when (result) {
+                            is DownloadResult.Success -> try {
+                                withContext(Dispatchers.IO) { repository.saveDownload(workId, result) }
+                                describe(result)
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Saved ${result.file} but could not record it", e)
+                                "Saved ${result.file.name} but couldn't add it to the library: ${e.message}"
+                            }
+                            is DownloadResult.Failure -> describe(result)
+                        }
+                        downloading = false
+                    }
+                },
+            )
         }
 
         BrowserToolbar(

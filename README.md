@@ -17,9 +17,9 @@ in-app, download whole works as EPUBs, read them offline, and resume exactly whe
 - A sticky footer under the browser has back, forward and refresh buttons. Back and forward follow the browsing
   history and are disabled at either end; refresh is the way out of an intermittent Cloudflare error or bot-check
   page, and stays available on the error screen.
-- On a work page, a temporary **Download EPUB** button saves the whole work (all chapters) to the app's private
-  storage, reusing the browser's session cookies. Failures are reported by kind (bot check, rate limit, server
-  error, ...). It never retries on its own; the download queue will handle that later.
+- On a work page, a **Download EPUB** bar appears above the footer and saves the whole work (all chapters) to the
+  app's private storage, reusing the browser's session cookies. Failures are reported by kind (bot check, rate
+  limit, server error, ...). It never retries on its own; the download queue will handle that later.
 - Each download is recorded in a local Room database, using metadata read from the work page that was already
   fetched (no extra request): title, authors, summary, rating, warnings, categories, fandoms, relationships,
   characters, tags, language, word and chapter counts, dates, and AO3's `updated_at` for later update checks.
@@ -49,7 +49,7 @@ Progress against the phased plan in [HANDOFF.md](HANDOFF.md):
 - [ ] 5a. Update dependencies and toolchain (Android Studio, AGP, Gradle, Kotlin, SDK, libraries)
 
 **Phase 2: making it pleasant**
-- [ ] 6. Injected download buttons
+- [x] 6. Download button in the app's own chrome (no DOM injection into AO3's page)
 - [ ] 7. Download queue
 - [ ] 8. "Already downloaded" badges
 

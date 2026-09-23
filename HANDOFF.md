@@ -78,7 +78,7 @@ The order gets a working read-offline loop early, then adds convenience on top. 
 
 ### Phase 2: Making it pleasant
 
-6. **Injected download buttons.** In `onPageFinished`, inject JS that adds a download button to each work blurb on list pages and to the work page. Buttons call Kotlin through `addJavascriptInterface` with the work ID. Selectors live in the single selectors file.
+6. **Download button, own chrome.** *(Revised 2026-09-22 — originally planned as JS-injected buttons on AO3's own pages; changed on reflection to keep AO3's rendered page completely untouched.)* A Download/Save bar appears above the footer only when the current page is a work page (same `workId` detection as before), with the existing Download EPUB button and status text. No DOM injection, no JS bridge, no `addJavascriptInterface`. Only covers the single work page you're viewing, same as before this step; a list-page picker (downloading from search/tag/bookmark pages without opening each work) was considered and deferred, not built. Progress display beyond the status text is left to Phase 3, alongside cancel/abort (see the Phase 3 notes above).
 7. **Download queue.** Sequential downloads with a delay, `Retry-After` handling on 429s, and queue state persisted in Room so it survives app close. Show progress and failures.
 8. **"Already downloaded" badges.** Inject a marker on works already in the library.
 
