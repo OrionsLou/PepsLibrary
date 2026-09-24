@@ -2,6 +2,7 @@ package app.pepslibrary.data
 
 import app.pepslibrary.download.DownloadResult
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 /** The list of downloaded works. Depends on [WorkDao] only, so it can be tested with a fake. */
 class LibraryRepository(
@@ -10,6 +11,9 @@ class LibraryRepository(
 ) {
     /** Most recently downloaded first. Emits again whenever the table changes. */
     val works: Flow<List<WorkEntity>> = dao.observeAll()
+
+    /** Null if [workId] isn't in the library. Emits again if that changes (e.g. a fresh download lands). */
+    fun isDownloaded(workId: Long): Flow<Boolean> = dao.observe(workId).map { it != null }
 
     /** Records a finished download. Downloading a work again replaces its row (new metadata, new timestamp). */
     suspend fun saveDownload(workId: Long, result: DownloadResult.Success) {

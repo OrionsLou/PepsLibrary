@@ -28,6 +28,10 @@ in-app, download whole works as EPUBs, read them offline, and resume exactly whe
 - Each download is recorded in a local Room database, using metadata read from the work page that was already
   fetched (no extra request): title, authors, summary, rating, warnings, categories, fandoms, relationships,
   characters, tags, language, word and chapter counts, dates, and AO3's `updated_at` for later update checks.
+- The library can be asked, per work ID, whether that work is already downloaded (`LibraryRepository.isDownloaded`,
+  live via Room). Scoped down from the original "already downloaded" badge plan: the data-layer check landed now,
+  and the visible badge/button change on AO3's own pages is deferred to the Phase 3 UI polish pass rather than done
+  as a one-off ahead of it.
 - The **Library** button in the footer opens a list of downloaded works (title, authors, fandoms, word and chapter
   counts with a Complete/In progress status, summary and download date). It slides over the browser, so the page
   and history you were on are kept. Downloading a work again replaces its entry.
@@ -56,7 +60,7 @@ Progress against the phased plan in [HANDOFF.md](HANDOFF.md):
 **Phase 2: making it pleasant**
 - [x] 6. Download button in the app's own chrome (no DOM injection into AO3's page)
 - [x] 7. Download queue
-- [ ] 8. "Already downloaded" badges
+- [~] 8. "Already downloaded" badges — data-layer check only (`isDownloaded`); visible badge deferred to 12
 
 **Phase 3: polish**
 - [ ] 9. WIP updates

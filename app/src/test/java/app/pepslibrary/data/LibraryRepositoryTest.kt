@@ -20,6 +20,7 @@ class LibraryRepositoryTest {
         override suspend fun upsert(work: WorkEntity) { upserts++; rows.value = rows.value + (work.workId to work) }
         override fun observeAll(): Flow<List<WorkEntity>> = rows.map { it.values.sortedByDescending { w -> w.downloadedAt } }
         override suspend fun get(workId: Long): WorkEntity? = rows.value[workId]
+        override fun observe(workId: Long): Flow<WorkEntity?> = rows.map { it[workId] }
     }
 
     private val dao = FakeWorkDao()
@@ -124,5 +125,17 @@ class LibraryRepositoryTest {
         clock = 2L; repository.saveDownload(3, success(metadata = fullMetadata.copy(title = "Third"), file = "3.epub"))
 
         assertEquals(listOf("Second", "Third", "First"), repository.works.first().map { it.title })
+    }
+
+    @Test
+    fun isDownloadedIsFalseForAWorkNotInTheLibrary() = runBlocking {
+        assertEquals(false, repository.isDownloaded(42).first())
+    }
+
+    @Test
+    fun isDownloadedBecomesTrueOnceTheWorkIsSaved() = runBlocking {
+        repository.saveDownload(42, success())
+        assertEquals(true, repository.isDownloaded(42).first())
+        assertEquals(false, repository.isDownloaded(99).first())
     }
 }

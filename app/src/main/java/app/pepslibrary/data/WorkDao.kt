@@ -16,4 +16,8 @@ interface WorkDao {
 
     @Query("SELECT * FROM works WHERE workId = :workId")
     suspend fun get(workId: Long): WorkEntity?
+
+    /** Emits again whenever the row for [workId] appears, changes, or is removed. */
+    @Query("SELECT * FROM works WHERE workId = :workId")
+    fun observe(workId: Long): Flow<WorkEntity?>
 }
