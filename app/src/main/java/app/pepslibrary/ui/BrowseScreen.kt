@@ -49,7 +49,12 @@ private const val TAG = "PepsLibrary"
 
 /** Hosts AO3 in a WebView. Sign-in happens on the site itself; the WebView's CookieManager owns the session. */
 @Composable
-fun BrowseScreen(queue: DownloadQueueRepository, onOpenLibrary: () -> Unit, modifier: Modifier = Modifier) {
+fun BrowseScreen(
+    queue: DownloadQueueRepository,
+    onOpenQueue: () -> Unit,
+    onOpenLibrary: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val context = LocalContext.current
     var progress by remember { mutableIntStateOf(0) }
     var canGoBack by remember { mutableStateOf(false) }
@@ -116,6 +121,7 @@ fun BrowseScreen(queue: DownloadQueueRepository, onOpenLibrary: () -> Unit, modi
             onBack = ::goBack,
             onForward = ::goForward,
             onRefresh = ::refresh,
+            onOpenQueue = onOpenQueue,
             onOpenLibrary = onOpenLibrary,
         )
     }
