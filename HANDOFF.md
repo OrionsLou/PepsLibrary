@@ -108,7 +108,7 @@ Observations from hands-on testing of the Phase 1 build, to fold into steps 11 a
 - **Layers:** UI (Compose screens), data (Room, download storage), network (OkHttp with WebView cookie jar), and an isolated AO3 "adapter" layer holding all selectors, injected JS, and parsing.
 - **Screens:** Browse (WebView), Library, Reader, and a Downloads/queue view (Phase 2).
 - **Cookie jar:** a small OkHttp `CookieJar` that reads from Android's `CookieManager` for the AO3 domain.
-- **Downloads:** run as a persisted queue (Room) processed by a single worker, so they can survive process death. WorkManager is a candidate for this **[decide]**.
+- **Downloads:** a persisted queue (Room) processed by a single worker scoped to the app process — not WorkManager, not a foreground service. See the decision under step 7's open questions below.
 
 ## 7. Working agreements for the Claude Code session
 
@@ -123,5 +123,13 @@ Observations from hands-on testing of the Phase 1 build, to fold into steps 11 a
 
 - Minimum Android version to target?
 - Where should downloaded EPUBs live (app-private storage versus a user-visible folder)?
-- WorkManager versus a simpler foreground service for the download queue?
+- ~~WorkManager versus a simpler foreground service for the download queue?~~ **Decided 2026-09-23:** neither. A
+  process-lifetime coroutine (the same pattern as `AppScope`, already used for saving reading position) processes
+  a Room-backed queue. Queue *state* survives the app closing and resumes on reopen; downloads do not continue
+  unattended once the process is fully killed (that tradeoff — option (a), "resumable," over option (b),
+  "unattended" — was explicitly chosen as good enough for a personal app). WorkManager's deferred/constrained
+  scheduling doesn't suit the queue's own tight retry/delay timing (`Retry-After`, sequential-with-a-pause), and a
+  foreground service's persistent notification is an unwarranted UX cost for work that stays in-app. Revisit only
+  if "keeps downloading while fully closed" becomes an actual want; the Room-backed state doesn't need to change
+  either way.
 - Should the library also store AO3 metadata (tags, summary, word count) at download time for sorting and filtering? This is deferred to Phase 3 unless wanted earlier.
