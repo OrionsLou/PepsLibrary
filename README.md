@@ -17,9 +17,14 @@ in-app, download whole works as EPUBs, read them offline, and resume exactly whe
 - A sticky footer under the browser has back, forward and refresh buttons. Back and forward follow the browsing
   history and are disabled at either end; refresh is the way out of an intermittent Cloudflare error or bot-check
   page, and stays available on the error screen.
-- On a work page, a **Download EPUB** bar appears above the footer and saves the whole work (all chapters) to the
-  app's private storage, reusing the browser's session cookies. Failures are reported by kind (bot check, rate
-  limit, server error, ...). It never retries on its own; the download queue will handle that later.
+- On a work page, a **Download EPUB** bar appears above the footer and adds the work to a download queue rather
+  than downloading it inline. The queue processes one work at a time, with a pause between downloads, and
+  automatically retries a bot check, rate limit, server error or network failure (up to 3 attempts, honoring
+  AO3's own `Retry-After` on a 429, backing off on its own otherwise) before giving up. The bar reflects the
+  work's queue status live: queued, downloading, retrying with the attempt count, or failed. The queue survives
+  the app closing and resumes on reopen, but doesn't keep running once the app is fully closed.
+- The **Downloads** button in the footer opens everything currently queued or failed, for a view across all
+  works rather than just the one you're on. A failed item can be retried or removed from there.
 - Each download is recorded in a local Room database, using metadata read from the work page that was already
   fetched (no extra request): title, authors, summary, rating, warnings, categories, fandoms, relationships,
   characters, tags, language, word and chapter counts, dates, and AO3's `updated_at` for later update checks.
@@ -50,7 +55,7 @@ Progress against the phased plan in [HANDOFF.md](HANDOFF.md):
 
 **Phase 2: making it pleasant**
 - [x] 6. Download button in the app's own chrome (no DOM injection into AO3's page)
-- [ ] 7. Download queue
+- [x] 7. Download queue
 - [ ] 8. "Already downloaded" badges
 
 **Phase 3: polish**
