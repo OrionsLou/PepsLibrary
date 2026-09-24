@@ -80,14 +80,22 @@ The order gets a working read-offline loop early, then adds convenience on top. 
 
 6. **Download button, own chrome.** *(Revised 2026-09-22 — originally planned as JS-injected buttons on AO3's own pages; changed on reflection to keep AO3's rendered page completely untouched.)* A Download/Save bar appears above the footer only when the current page is a work page (same `workId` detection as before), with the existing Download EPUB button and status text. No DOM injection, no JS bridge, no `addJavascriptInterface`. Only covers the single work page you're viewing, same as before this step; a list-page picker (downloading from search/tag/bookmark pages without opening each work) was considered and deferred, not built. Progress display beyond the status text is left to Phase 3, alongside cancel/abort (see the Phase 3 notes above).
 7. **Download queue.** *(Done 2026-09-23, in four chunks: the Room table, the repository, the processor loop, and the UI.)* Sequential downloads with a delay, `Retry-After` handling on 429s, and queue state persisted in Room so it survives app close (queue state, not active execution: the processor is a process-lifetime coroutine, not WorkManager or a foreground service — see the decision recorded under "Suggested architecture" — so downloads pause if the app is fully closed and resume on reopen, rather than continuing unattended). Automatic retry up to 3 attempts for a retryable failure kind (bot check, rate limit, server error, network), with AO3's own `Retry-After` honored exactly and our own backoff (30s, doubling, capped at 5 minutes) otherwise; a non-retryable failure, or a retryable one past the cap, lands on FAILED for manual retry. Progress beyond status text (queued / downloading / retrying with attempt count / failed) stays deferred to Phase 3, per the existing notes. A Downloads screen (footer button) shows everything queued or failed at once, with Retry and Remove; a work's own page shows just its own entry. Queue rows show "Work `<id>`" rather than a title, since a title isn't known until the work page is actually fetched — deferred as a Phase 3 polish candidate rather than adding a schema column for a cosmetic field.
-8. **"Already downloaded" badges.** Inject a marker on works already in the library.
+8. **"Already downloaded" badges.** *(Split by decision on 2026-09-24.)* Inject a marker on works already in the
+   library.
+
+   > **Split, not deferred.** The data-layer half landed now: `WorkDao.observe(workId)` and
+   > `LibraryRepository.isDownloaded(workId): Flow<Boolean>`, the same keyed-by-workId pattern
+   > `DownloadQueueRepository.entries` already uses, so a screen can react live to a work entering or leaving the
+   > library. The visible half — a badge in AO3 search/browse results, or changing the Download bar's own
+   > appearance/text on a work's page — is deferred to step 12 (UI polish) rather than built now, since it's a
+   > presentation decision better made alongside the rest of that pass, not a one-off ahead of it.
 
 ### Phase 3: Polish
 
 9. **WIP updates.** Re-download the EPUB to pick up new chapters while keeping the reading position.
 10. **Library management.** Delete works, sort/filter, resume-reading shortcut, storage usage.
 11. **Hardening.** Cookies in encrypted storage, sensible error and offline states, GitHub Releases plus Obtainium for updates.
-12. **UI polish and aesthetic tweaks.** *(Added after hardening.)* A visual pass over the whole app once the features are in place: consistent theming (including dark mode), spacing and typography, app icon and splash, empty and loading states, and replacing the temporary scaffolding UI (such as the Download EPUB bar) with a finished design.
+12. **UI polish and aesthetic tweaks.** *(Added after hardening.)* A visual pass over the whole app once the features are in place: consistent theming (including dark mode), spacing and typography, app icon and splash, empty and loading states, and replacing the temporary scaffolding UI (such as the Download EPUB bar) with a finished design. Also carries the visible half of step 8: a badge on already-downloaded works in AO3 search/browse results and/or a changed Download bar appearance on a work's own page, using `LibraryRepository.isDownloaded` (already built).
 
 ### Notes to revisit in Phase 3
 

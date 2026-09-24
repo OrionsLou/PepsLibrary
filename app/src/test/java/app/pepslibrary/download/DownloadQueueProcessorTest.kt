@@ -46,6 +46,7 @@ class DownloadQueueProcessorTest {
         override suspend fun upsert(work: WorkEntity) { rows.value = rows.value + (work.workId to work) }
         override fun observeAll(): Flow<List<WorkEntity>> = rows.map { it.values.sortedByDescending { w -> w.downloadedAt } }
         override suspend fun get(workId: Long): WorkEntity? = rows.value[workId]
+        override fun observe(workId: Long): Flow<WorkEntity?> = rows.map { it[workId] }
     }
 
     private val queueDao = FakeQueueDao()
