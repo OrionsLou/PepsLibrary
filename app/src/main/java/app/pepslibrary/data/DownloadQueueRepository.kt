@@ -29,6 +29,9 @@ class DownloadQueueRepository(
 
     suspend fun get(workId: Long): DownloadQueueEntity? = dao.get(workId)
 
+    /** The oldest work that's ready to download right now, or null if the queue is empty or everything is waiting. */
+    suspend fun nextEligible(): DownloadQueueEntity? = dao.nextEligible(QueueStatus.PENDING, now())
+
     /** Adds a work to the queue, or resets it to a fresh attempt if it was already there (e.g. sitting at FAILED). */
     suspend fun enqueue(workId: Long) {
         dao.upsert(

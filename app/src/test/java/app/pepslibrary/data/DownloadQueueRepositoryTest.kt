@@ -27,6 +27,10 @@ class DownloadQueueRepositoryTest {
         override suspend fun resetStatus(from: QueueStatus, to: QueueStatus) {
             rows.value = rows.value.mapValues { (_, e) -> if (e.status == from) e.copy(status = to, notBeforeMillis = null) else e }
         }
+        override suspend fun nextEligible(status: QueueStatus, now: Long): DownloadQueueEntity? =
+            rows.value.values
+                .filter { it.status == status && (it.notBeforeMillis == null || it.notBeforeMillis!! <= now) }
+                .minByOrNull { it.enqueuedAt }
     }
 
     private val dao = FakeDao()
