@@ -27,6 +27,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -39,29 +40,27 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import app.pepslibrary.ao3.Ao3
-import app.pepslibrary.data.LibraryRepository
-import app.pepslibrary.download.DownloadResult
-import app.pepslibrary.download.EpubDownloader
-import app.pepslibrary.network.Ao3Http
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
+import app.pepslibrary.data.DownloadQueueEntity
+import app.pepslibrary.data.DownloadQueueRepository
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.io.File
 
 private const val TAG = "PepsLibrary"
 
 /** Hosts AO3 in a WebView. Sign-in happens on the site itself; the WebView's CookieManager owns the session. */
 @Composable
-fun BrowseScreen(repository: LibraryRepository, onOpenLibrary: () -> Unit, modifier: Modifier = Modifier) {
+fun BrowseScreen(
+    queue: DownloadQueueRepository,
+    onOpenQueue: () -> Unit,
+    onOpenLibrary: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val context = LocalContext.current
     var progress by remember { mutableIntStateOf(0) }
     var canGoBack by remember { mutableStateOf(false) }
     var canGoForward by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var currentUrl by remember { mutableStateOf<String?>(null) }
-    var downloadStatus by remember { mutableStateOf<String?>(null) }
-    var downloading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     val webView = remember {
@@ -75,10 +74,6 @@ fun BrowseScreen(repository: LibraryRepository, onOpenLibrary: () -> Unit, modif
     }
     DisposableEffect(webView) { onDispose { webView.destroy() } }
 
-    // The client must send the WebView's exact user-agent, so it is built from the WebView's own settings.
-    val downloader = remember {
-        EpubDownloader(Ao3Http.createClient(webView.settings.userAgentString), File(context.filesDir, "works"))
-    }
     val workId = Ao3.workIdFromUrl(currentUrl)
 
     fun goBack() { error = null; webView.goBack() }
@@ -108,29 +103,15 @@ fun BrowseScreen(repository: LibraryRepository, onOpenLibrary: () -> Unit, modif
 
         // Sits between the page and the footer rather than over the page, so AO3's own content is never covered.
         if (workId != null) {
+            // Re-derived whenever workId changes, so navigating to a different work page swaps which entry we
+            // watch. The queue's own Flow drives this: no local "just tapped" state to keep in sync by hand.
+            val entry by remember(workId) {
+                queue.entries.map { entries -> entries.find { it.workId == workId } }
+            }.collectAsState(initial = null)
+
             DownloadBar(
-                status = downloadStatus,
-                enabled = !downloading,
-                onDownload = {
-                    downloading = true
-                    downloadStatus = "Downloading work $workId..."
-                    scope.launch {
-                        val result = withContext(Dispatchers.IO) { downloader.download(workId) }
-                        downloadStatus = when (result) {
-                            is DownloadResult.Success -> try {
-                                withContext(Dispatchers.IO) { repository.saveDownload(workId, result) }
-                                describe(result)
-                            } catch (e: CancellationException) {
-                                throw e
-                            } catch (e: Exception) {
-                                Log.e(TAG, "Saved ${result.file} but could not record it", e)
-                                "Saved ${result.file.name} but couldn't add it to the library: ${e.message}"
-                            }
-                            is DownloadResult.Failure -> describe(result)
-                        }
-                        downloading = false
-                    }
-                },
+                entry = entry,
+                onDownload = { scope.launch { queue.enqueue(workId) } },
             )
         }
 
@@ -140,28 +121,18 @@ fun BrowseScreen(repository: LibraryRepository, onOpenLibrary: () -> Unit, modif
             onBack = ::goBack,
             onForward = ::goForward,
             onRefresh = ::refresh,
+            onOpenQueue = onOpenQueue,
             onOpenLibrary = onOpenLibrary,
         )
     }
 }
 
-private fun describe(result: DownloadResult): String = when (result) {
-    is DownloadResult.Success -> {
-        Log.i(TAG, "Saved ${result.file} (${result.bytes} bytes) from ${result.epubUrl}")
-        "Saved \"${result.metadata.title ?: result.file.name}\" (${result.bytes / 1024} KB) to your library"
-    }
-    is DownloadResult.Failure -> {
-        Log.w(TAG, "Download failed: ${result.kind}: ${result.message}")
-        "${result.kind}: ${result.message}"
-    }
-}
-
 @Composable
-private fun DownloadBar(status: String?, enabled: Boolean, onDownload: () -> Unit, modifier: Modifier = Modifier) {
+private fun DownloadBar(entry: DownloadQueueEntity?, onDownload: () -> Unit, modifier: Modifier = Modifier) {
     Surface(modifier = modifier.fillMaxWidth(), tonalElevation = 6.dp) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = onDownload, enabled = enabled) { Text("Download EPUB") }
-            status?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+            Button(onClick = onDownload, enabled = queueButtonEnabled(entry)) { Text(queueButtonLabel(entry)) }
+            queueStatusLabel(entry)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
         }
     }
 }

@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -20,8 +21,8 @@ import app.pepslibrary.ao3.Ao3
 
 /**
  * Sticky footer under the WebView. Back and forward walk the WebView's history and are disabled at either end.
- * Refresh is the way out when AO3 or Cloudflare serves an error or a bot-check page. Library opens the list of
- * downloaded works.
+ * Refresh is the way out when AO3 or Cloudflare serves an error or a bot-check page. Downloads opens everything
+ * currently queued or failed; Library opens the list of works already downloaded.
  */
 @Composable
 fun BrowserToolbar(
@@ -30,6 +31,7 @@ fun BrowserToolbar(
     onBack: () -> Unit,
     onForward: () -> Unit,
     onRefresh: () -> Unit,
+    onOpenQueue: () -> Unit,
     onOpenLibrary: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -47,6 +49,11 @@ fun BrowserToolbar(
             }
             IconButton(onClick = onRefresh) {
                 Icon(Icons.Default.Refresh, contentDescription = "Refresh page")
+            }
+            // No download-shaped icon in the small icon set this project depends on (material-icons-core); the
+            // full extended set is a real dependency and APK-size cost for one icon. Revisit in phase 3 polish.
+            IconButton(onClick = onOpenQueue) {
+                Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Downloads")
             }
             IconButton(onClick = onOpenLibrary) {
                 Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Library")
