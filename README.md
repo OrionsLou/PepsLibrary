@@ -34,7 +34,8 @@ in-app, download whole works as EPUBs, read them offline, and resume exactly whe
   as a one-off ahead of it.
 - The **Library** button in the footer opens a list of downloaded works (title, authors, fandoms, word and chapter
   counts with a Complete/In progress status, summary and download date). It slides over the browser, so the page
-  and history you were on are kept. Downloading a work again replaces its entry.
+  and history you were on are kept. Downloading a work again replaces its entry. The trash icon on a work deletes
+  it (after a confirmation), along with its file and reading position.
 - Tapping a work in the library opens it in a **reader** built on the [Readium](https://readium.org) toolkit
   (version 3.1.2): swipe or tap the page edges to turn pages, with the title and percent read in a top bar. The
   reading position is saved (as a Readium locator, in Room) when you leave, when the app is stopped, and a second

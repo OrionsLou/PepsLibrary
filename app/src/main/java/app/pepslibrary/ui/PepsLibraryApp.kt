@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.LocalContext
 import app.pepslibrary.data.AppDatabase
 import app.pepslibrary.data.DownloadQueueRepository
 import app.pepslibrary.data.LibraryRepository
+import app.pepslibrary.data.QueueStatus
 import app.pepslibrary.data.ReadingProgressRepository
 import app.pepslibrary.download.DownloadQueueProcessor
 import app.pepslibrary.download.EpubDownloader
@@ -29,7 +30,8 @@ import java.io.File
 fun PepsLibraryApp() {
     val context = LocalContext.current
     val database = remember { AppDatabase.get(context) }
-    val repository = remember { LibraryRepository(database.workDao()) }
+    val worksDir = remember { File(context.filesDir, "works") }
+    val repository = remember { LibraryRepository(database.workDao(), worksDir) }
     val progress = remember { ReadingProgressRepository(database.readingProgressDao()) }
     val queue = remember { DownloadQueueRepository(database.downloadQueueDao()) }
     val scope = rememberCoroutineScope()
@@ -42,7 +44,7 @@ fun PepsLibraryApp() {
     remember {
         val downloader = EpubDownloader(
             Ao3Http.createClient(WebSettings.getDefaultUserAgent(context)),
-            File(context.filesDir, "works"),
+            worksDir,
         )
         DownloadQueueProcessor(queue, repository, downloader::download) { workId, result ->
             val before = result.previousChapters
@@ -71,10 +73,19 @@ fun PepsLibraryApp() {
         if (showLibrary) {
             val works by repository.works.collectAsState(initial = emptyList())
             val fractions by progress.fractions.collectAsState(initial = emptyMap())
+            val queued by queue.entries.collectAsState(initial = emptyList())
             LibraryScreen(
                 works = works,
                 progress = fractions,
+                downloading = queued.filter { it.status == QueueStatus.IN_PROGRESS }.map { it.workId }.toSet(),
                 onOpenWork = { workId -> context.startActivity(ReaderActivity.intent(context, workId)) },
+                onDeleteWork = { workId ->
+                    scope.launch {
+                        // Drop any queued re-download first, or it would bring the work straight back.
+                        queue.remove(workId)
+                        repository.delete(workId)
+                    }
+                },
                 onBack = { showLibrary = false },
             )
         }

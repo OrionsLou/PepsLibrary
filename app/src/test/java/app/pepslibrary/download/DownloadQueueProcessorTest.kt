@@ -47,13 +47,14 @@ class DownloadQueueProcessorTest {
         override fun observeAll(): Flow<List<WorkEntity>> = rows.map { it.values.sortedByDescending { w -> w.downloadedAt } }
         override suspend fun get(workId: Long): WorkEntity? = rows.value[workId]
         override fun observe(workId: Long): Flow<WorkEntity?> = rows.map { it[workId] }
+        override suspend fun delete(workId: Long) { rows.value = rows.value - workId }
     }
 
     private val queueDao = FakeQueueDao()
     private val workDao = FakeWorkDao()
     private var clock = 1_000_000L
     private val queue = DownloadQueueRepository(queueDao) { clock }
-    private val library = LibraryRepository(workDao) { clock }
+    private val library = LibraryRepository(workDao, File("/unused")) { clock }
 
     private val calls = mutableListOf<Long>()
 

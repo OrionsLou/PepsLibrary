@@ -100,7 +100,16 @@ The order gets a working read-offline loop early, then adds convenience on top. 
 
    Chosen over text-anchored bookmarks (store the sentence at the top of the page and search for it after an update), which were considered and dropped as a much larger lift: Readium selection plumbing, sentence segmentation, text normalization and duplicate-match handling, for little gain once chapter navigation (step 9a) covers the remaining gaps by hand. The banner is a `notice` column on `reading_progress` (migration 3→4); any normal save replaces the row without it, so it shows once. Verified on the emulator with a real re-download of a real WIP against planted "older" copies: an edited current chapter (→ chapter start, banner) and an inserted earlier chapter (→ exact spot in the renumbered file).
 9a. **Chapter navigation and position seeking.** *(Added and done 2026-09-26.)* Built as a bottom bar over the page (so it never re-paginates): a slider stepping through Readium positions (about a page each) with a live "chapter · percent" preview that jumps on release, and a Chapters button opening a bottom sheet scrolled to the current chapter. Shown when a work opens; a tap in the middle of the page toggles it (edge taps still turn pages), and its down arrow or dragging it down closes it. Swipe-up-to-open and a floating corner button were tried and dropped: the swipe was unreliable in practice and the button covered text. Original plan: in the reader, a chapter list from Readium's `publication.tableOfContents` (it will include Preface and Afterword) that jumps with `navigator.go(link)`, and a way to seek to a point in the work. Seek by Readium's `publication.positions()` (fixed ~1,024-character slices) or a percentage rather than rendered page numbers, which shift with font size and rotation. Position numbers are recomputed after an update, which is fine for manual navigation.
-10. **Library management.** Delete works, sort/filter, resume-reading shortcut, storage usage.
+10. **Library management.** Delete works, sort/filter, resume-reading shortcut, storage usage. *(Planned 2026-09-27 as one PR per feature, all from data already stored per work; no schema change or extra AO3 requests.)*
+    1. **Delete** *(done)*: trash icon on each library card, with a confirmation dialog. Removes the row, its reading position (foreign key cascade) and the EPUB file, and first drops any queued or failed re-download so it can't bring the work back. Disabled while that work is actively downloading, as on the Downloads screen.
+    2. **Sort by title**: case-insensitive; a leading "The"/"A" is not skipped, matching AO3.
+    3. **Sort by author**: by the first listed author (AO3's byline order); "Anonymous" works group together.
+    4. **Sort by date downloaded**: the *latest* download, since a WIP re-download updates it. The first-download date isn't stored.
+    5. **Filter by author**: a co-authored work appears under each author; one person's different pseuds show as separate authors.
+    6. **Filter by completion status**: Completed (all chapters out), WIP (chapters still to come, or an unknown total like "3/?"), and **Other** for works whose chapter counts couldn't be read at download time, so they can be filtered explicitly rather than only appearing under All.
+    7. **Filter by fandom**: a crossover appears under each of its fandoms; fandom names are AO3's exact wording, so e.g. book and movie fandoms are separate.
+
+    Filters of different kinds combine (e.g. a fandom plus WIP only); design the filter state for that from PR 5 onward.
 11. **Hardening.** Cookies in encrypted storage, sensible error and offline states, GitHub Releases plus Obtainium for updates.
 12. **UI polish and aesthetic tweaks.** *(Added after hardening.)* A visual pass over the whole app once the features are in place: consistent theming (including dark mode), spacing and typography, app icon and splash, empty and loading states, and replacing the temporary scaffolding UI (such as the Download EPUB bar) with a finished design. Also carries the visible half of step 8: a badge on already-downloaded works in AO3 search/browse results and/or a changed Download bar appearance on a work's own page, using `LibraryRepository.isDownloaded` (already built).
 
@@ -117,6 +126,7 @@ Observations from hands-on testing of the Phase 1 build, to fold into steps 11 a
    - Read `Content-Length` from the EPUB response for a determinate bar, and fall back to an indeterminate one when it is absent.
    - There may be a quiet gap before the first byte while AO3 builds the file, so show a "waiting for AO3" state distinct from "downloading", and distinguish the work-page load from the file transfer.
    - Report progress from the downloader through a callback so the queue (step 7) and the UI can share it.
+4. **Make deleting a work feel less abrupt** *(fits step 12, UI polish)*. Today the card vanishes instantly and the list jumps. Wanted: visible feedback on removal, e.g. the card fading or sliding out while the rest of the list closes the gap smoothly (`LazyColumn` item animations), or a brief "Deleted" message.
 
 ## 6. Suggested architecture
 
