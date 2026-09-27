@@ -39,6 +39,7 @@ fun PepsLibraryApp() {
     var showQueue by rememberSaveable { mutableStateOf(false) }
     // Kept here rather than in the library screen, so closing and reopening the library keeps the chosen order.
     var librarySort by rememberSaveable { mutableStateOf(LibrarySort.DOWNLOADED) }
+    var librarySortReversed by rememberSaveable { mutableStateOf(false) }
 
     // Started once per process. WebSettings.getDefaultUserAgent gives the same string a WebView would report,
     // without needing a live WebView instance: the queue outlives any one browser page, so it can't borrow the
@@ -80,8 +81,8 @@ fun PepsLibraryApp() {
                 works = works,
                 progress = fractions,
                 downloading = queued.filter { it.status == QueueStatus.IN_PROGRESS }.map { it.workId }.toSet(),
-                sort = librarySort,
-                onSortChange = { librarySort = it },
+                order = LibraryOrder(librarySort, librarySortReversed),
+                onOrderChange = { librarySort = it.sort; librarySortReversed = it.reversed },
                 onOpenWork = { workId -> context.startActivity(ReaderActivity.intent(context, workId)) },
                 onDeleteWork = { workId ->
                     scope.launch {
