@@ -4,6 +4,7 @@ import android.webkit.WebSettings
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,9 +40,16 @@ fun PepsLibraryApp() {
     var showLibrary by rememberSaveable { mutableStateOf(false) }
     var showQueue by rememberSaveable { mutableStateOf(false) }
     // Kept here rather than in the library screen, so closing and reopening the library keeps the chosen order.
-    var librarySort by rememberSaveable { mutableStateOf(LibrarySort.OPENED) }
-    var librarySortReversed by rememberSaveable { mutableStateOf(false) }
-    var libraryFilter by rememberSaveable(stateSaver = LibraryFilterSaver) { mutableStateOf(LibraryFilter()) }
+    // Starts from the last saved choice, so it also survives an app restart; rememberSaveable still covers the
+    // activity being recreated in between.
+    val viewStore = remember { LibraryViewStore(context) }
+    val savedView = remember { viewStore.load() }
+    var librarySort by rememberSaveable { mutableStateOf(savedView.toOrder().sort) }
+    var librarySortReversed by rememberSaveable { mutableStateOf(savedView.toOrder().reversed) }
+    var libraryFilter by rememberSaveable(stateSaver = LibraryFilterSaver) { mutableStateOf(savedView.toFilter()) }
+    LaunchedEffect(librarySort, librarySortReversed, libraryFilter) {
+        viewStore.save(SavedLibraryView.of(LibraryOrder(librarySort, librarySortReversed), libraryFilter))
+    }
 
     // Started once per process. WebSettings.getDefaultUserAgent gives the same string a WebView would report,
     // without needing a live WebView instance: the queue outlives any one browser page, so it can't borrow the
