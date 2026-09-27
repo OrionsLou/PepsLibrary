@@ -87,6 +87,7 @@ fun PepsLibraryApp() {
                 filter = libraryFilter,
                 onFilterChange = { libraryFilter = it },
                 onOpenWork = { workId -> context.startActivity(ReaderActivity.intent(context, workId)) },
+                onSetPinned = { workId, pinned -> scope.launch { repository.setPinned(workId, pinned) } },
                 onDeleteWork = { workId ->
                     scope.launch {
                         // Drop any queued re-download first, or it would bring the work straight back.

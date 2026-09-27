@@ -29,6 +29,9 @@ class LibraryRepositoryTest {
         override suspend fun markOpened(workId: Long, at: Long) {
             rows.value[workId]?.let { rows.value = rows.value + (workId to it.copy(lastOpenedAt = at)) }
         }
+        override suspend fun setPinned(workId: Long, pinned: Boolean) {
+            rows.value[workId]?.let { rows.value = rows.value + (workId to it.copy(pinned = pinned)) }
+        }
     }
 
     @get:Rule
@@ -146,6 +149,24 @@ class LibraryRepositoryTest {
         clock = 7_000L
         repository.markOpened(42)
         assertEquals(7_000L, dao.get(42)!!.lastOpenedAt)
+    }
+
+    @Test
+    fun aWorkCanBePinnedAndUnpinned_andStartsUnpinned() = runBlocking {
+        repository.saveDownload(42, success())
+        assertFalse(dao.get(42)!!.pinned)
+        repository.setPinned(42, true)
+        assertTrue(dao.get(42)!!.pinned)
+        repository.setPinned(42, false)
+        assertFalse(dao.get(42)!!.pinned)
+    }
+
+    @Test
+    fun reDownloadingAPinnedWorkKeepsItPinned() = runBlocking {
+        repository.saveDownload(42, success())
+        repository.setPinned(42, true)
+        repository.saveDownload(42, success(updatedAt = 1800000000))
+        assertTrue(dao.get(42)!!.pinned)
     }
 
     @Test

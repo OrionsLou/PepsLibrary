@@ -11,13 +11,35 @@ class LibrarySortTest {
         downloadedAt: Long,
         authors: List<String> = emptyList(),
         lastOpenedAt: Long? = null,
+        pinned: Boolean = false,
     ) = WorkEntity(
         workId = id, title = title, authors = authors, summary = null, rating = null, warnings = emptyList(),
         categories = emptyList(), fandoms = emptyList(), relationships = emptyList(), characters = emptyList(),
         tags = emptyList(), language = null, words = null, chaptersPublished = null, chaptersTotal = null,
         publishedDate = null, updatedDate = null, sourceUpdatedAt = null, epubFileName = "$id.epub",
-        fileSizeBytes = 0, downloadedAt = downloadedAt, lastOpenedAt = lastOpenedAt,
+        fileSizeBytes = 0, downloadedAt = downloadedAt, lastOpenedAt = lastOpenedAt, pinned = pinned,
     )
+
+    // Pinned: "Zeta" (read long ago) and "Alpha" (never read). Unpinned: "Beta" (read recently) and "Gamma".
+    private val withPins = listOf(
+        work(1, "Beta", downloadedAt = 10, lastOpenedAt = 500),
+        work(2, "Zeta", downloadedAt = 20, lastOpenedAt = 100, pinned = true),
+        work(3, "Gamma", downloadedAt = 30),
+        work(4, "Alpha", downloadedAt = 40, pinned = true),
+    )
+
+    @Test
+    fun pinnedWorksComeFirstUnderEverySort_orderedAmongThemselvesByThatSort() {
+        assertEquals(listOf("Zeta", "Alpha", "Beta", "Gamma"), titles(withPins, LibrarySort.OPENED))
+        assertEquals(listOf("Alpha", "Zeta", "Gamma", "Beta"), titles(withPins, LibrarySort.DOWNLOADED))
+        assertEquals(listOf("Alpha", "Zeta", "Beta", "Gamma"), titles(withPins, LibrarySort.TITLE))
+    }
+
+    @Test
+    fun reversingASortKeepsPinnedWorksFirst() {
+        assertEquals(listOf("Zeta", "Alpha", "Gamma", "Beta"), titles(withPins, LibrarySort.TITLE, reversed = true))
+        assertEquals(listOf("Zeta", "Alpha", "Beta", "Gamma"), titles(withPins, LibrarySort.DOWNLOADED, reversed = true))
+    }
 
     // Two opened (the older-downloaded one opened most recently), two never opened.
     private val opened = listOf(

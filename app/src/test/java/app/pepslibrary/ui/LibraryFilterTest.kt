@@ -164,6 +164,20 @@ class LibraryFilterTest {
     }
 
     @Test
+    fun pinnedOnlyShowsJustPinnedWorks_andCombinesWithOtherKinds() {
+        val pinnedLibrary = library.map { if (it.workId in setOf(1L, 3L)) it.copy(pinned = true) else it }
+        fun shownIn(filter: LibraryFilter) = pinnedLibrary.filter(filter::matches).map { it.workId }
+
+        val pinnedOnly = LibraryFilter().togglePinnedOnly()
+        assertTrue(pinnedOnly.isActive)
+        assertEquals(1, pinnedOnly.selectedCount)
+        assertEquals(listOf(1L, 3L), shownIn(pinnedOnly))
+        assertEquals(listOf(3L), shownIn(pinnedOnly.toggleStatus(CompletionStatus.WIP)))
+        assertEquals(LibraryFilter(), pinnedOnly.togglePinnedOnly())
+        assertEquals(FilterOption("pinned", "Pinned only", 2), pinnedOption(pinnedLibrary))
+    }
+
+    @Test
     fun theWorkCountSaysHowManyAreShownWhileFiltering() {
         assertEquals("4 works", workCountLabel(shown = 4, total = 4, filtered = false))
         assertEquals("2 of 4 works", workCountLabel(shown = 2, total = 4, filtered = true))

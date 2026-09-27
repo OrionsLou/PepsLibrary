@@ -17,16 +17,20 @@ data class LibraryFilter(
     val authors: Set<String> = emptySet(),
     val statuses: Set<CompletionStatus> = emptySet(),
     val fandoms: Set<String> = emptySet(),
+    val pinnedOnly: Boolean = false,
 ) {
     val isActive: Boolean get() = selectedCount > 0
 
     /** Selected values across every kind, for the "Filter (n)" button. */
-    val selectedCount: Int get() = authors.size + statuses.size + fandoms.size
+    val selectedCount: Int get() = authors.size + statuses.size + fandoms.size + (if (pinnedOnly) 1 else 0)
 
     fun matches(work: WorkEntity): Boolean =
-        (authors.isEmpty() || authorKeys(work).any { it in authors }) &&
+        (!pinnedOnly || work.pinned) &&
+            (authors.isEmpty() || authorKeys(work).any { it in authors }) &&
             (statuses.isEmpty() || completionStatus(work) in statuses) &&
             (fandoms.isEmpty() || fandomKeys(work).any { it in fandoms })
+
+    fun togglePinnedOnly(): LibraryFilter = copy(pinnedOnly = !pinnedOnly)
 
     fun toggleAuthor(author: String): LibraryFilter = copy(authors = authors.toggle(author))
 
@@ -39,18 +43,30 @@ private fun <T> Set<T>.toggle(value: T): Set<T> = if (value in this) this - valu
 
 /** Lets the filter survive the library closing and the activity being recreated, like the sort does. */
 val LibraryFilterSaver: Saver<LibraryFilter, ArrayList<ArrayList<String>>> = Saver(
-    save = { arrayListOf(ArrayList(it.authors), ArrayList(it.statuses.map { s -> s.name }), ArrayList(it.fandoms)) },
+    save = {
+        arrayListOf(
+            ArrayList(it.authors),
+            ArrayList(it.statuses.map { s -> s.name }),
+            ArrayList(it.fandoms),
+            arrayListOf(it.pinnedOnly.toString()),
+        )
+    },
     restore = {
         LibraryFilter(
             authors = it[0].toSet(),
             statuses = it[1].map(CompletionStatus::valueOf).toSet(),
             fandoms = it[2].toSet(),
+            pinnedOnly = it[3].single().toBoolean(),
         )
     },
 )
 
 /** One checkbox in the filter sheet: [value] is what's stored in the filter, [count] how many works have it. */
 data class FilterOption(val value: String, val label: String, val count: Int)
+
+/** The single "Pinned only" choice, with how many works are pinned. */
+fun pinnedOption(works: List<WorkEntity>): FilterOption =
+    FilterOption("pinned", "Pinned only", works.count { it.pinned })
 
 /** The authors in the library; see [namedOptions]. */
 fun authorOptions(works: List<WorkEntity>, filter: LibraryFilter): List<FilterOption> =
