@@ -7,6 +7,7 @@ import java.util.Locale
 enum class LibrarySort(val label: String) {
     DOWNLOADED("Date downloaded"),
     TITLE("Title"),
+    AUTHOR("Author"),
 }
 
 /**
@@ -19,11 +20,18 @@ fun sortWorks(works: List<WorkEntity>, sort: LibrarySort): List<WorkEntity> {
     return when (sort) {
         LibrarySort.DOWNLOADED -> works.sortedWith(newestFirst)
         LibrarySort.TITLE -> works.sortedWith(compareBy<WorkEntity> { titleSortKey(it.title) }.then(newestFirst))
+        // By the first listed author, AO3's byline order; one author's works by title. No known author goes last.
+        LibrarySort.AUTHOR -> works.sortedWith(
+            compareBy<WorkEntity> { it.authors.isEmpty() }
+                .thenBy { it.authors.firstOrNull()?.let(::titleSortKey) }
+                .thenBy { titleSortKey(it.title) }
+                .then(newestFirst),
+        )
     }
 }
 
 /**
- * Case and accents ignored ("Élan" sorts with "elan"), a leading "The"/"A" kept as AO3 does, and word by word: a
+ * Used for author names too. Case and accents ignored ("Élan" sorts with "elan"), a leading "The"/"A" kept as AO3 does, and word by word: a
  * space sorts before any letter, so "A Quiet Place" comes before "Album".
  */
 internal fun titleSortKey(title: String): String =

@@ -5,8 +5,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class LibrarySortTest {
-    private fun work(id: Long, title: String, downloadedAt: Long) = WorkEntity(
-        workId = id, title = title, authors = emptyList(), summary = null, rating = null, warnings = emptyList(),
+    private fun work(id: Long, title: String, downloadedAt: Long, authors: List<String> = emptyList()) = WorkEntity(
+        workId = id, title = title, authors = authors, summary = null, rating = null, warnings = emptyList(),
         categories = emptyList(), fandoms = emptyList(), relationships = emptyList(), characters = emptyList(),
         tags = emptyList(), language = null, words = null, chaptersPublished = null, chaptersTotal = null,
         publishedDate = null, updatedDate = null, sourceUpdatedAt = null, epubFileName = "$id.epub",
@@ -35,6 +35,22 @@ class LibrarySortTest {
         assertEquals(
             listOf("A Quiet Place", "Álbum", "bulbs in the dirt", "The Summers of Draco Malfoy"),
             titles(LibrarySort.TITLE),
+        )
+    }
+
+    @Test
+    fun byAuthorUsesTheFirstListedAuthor_thenTitle_withUnknownAuthorsLast() {
+        val library = listOf(
+            work(1, "Zebra", downloadedAt = 1, authors = listOf("spect3rr")),
+            work(2, "No byline", downloadedAt = 9),
+            work(3, "Apple", downloadedAt = 2, authors = listOf("Spect3rr")),
+            work(4, "Co-written", downloadedAt = 3, authors = listOf("Zed", "Aardvark")),
+            work(5, "Middle", downloadedAt = 4, authors = listOf("Émile")),
+            work(6, "Unsigned", downloadedAt = 5, authors = listOf("Anonymous")),
+        )
+        assertEquals(
+            listOf("Unsigned", "Middle", "Apple", "Zebra", "Co-written", "No byline"),
+            sortWorks(library, LibrarySort.AUTHOR).map { it.title },
         )
     }
 
