@@ -28,6 +28,9 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.ui.draw.rotate
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
@@ -64,6 +67,7 @@ fun LibraryScreen(
     filter: LibraryFilter,
     onFilterChange: (LibraryFilter) -> Unit,
     onOpenWork: (workId: Long) -> Unit,
+    onSetPinned: (workId: Long, pinned: Boolean) -> Unit,
     onDeleteWork: (workId: Long) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -150,6 +154,7 @@ fun LibraryScreen(
                             progressLabel = readingProgressLabel(progress[work.workId]),
                             canDelete = work.workId !in downloading,
                             onClick = { onOpenWork(work.workId) },
+                            onTogglePin = { onSetPinned(work.workId, !work.pinned) },
                             onDelete = { confirmDelete = work },
                         )
                     }
@@ -179,6 +184,10 @@ private fun FilterSheet(
             TextButton(onClick = { onFilterChange(LibraryFilter()) }, enabled = filter.isActive) { Text("Clear all") }
         }
         LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
+            item { FilterSectionHeader("Pinned") }
+            item(key = "pinned") {
+                FilterRow(pinnedOption(works), checked = filter.pinnedOnly) { onFilterChange(filter.togglePinnedOnly()) }
+            }
             item { FilterSectionHeader("Status") }
             items(statusOptions(works), key = { "status:${it.value}" }) { option ->
                 val status = CompletionStatus.valueOf(option.value)
@@ -268,6 +277,7 @@ private fun WorkCard(
     progressLabel: String,
     canDelete: Boolean,
     onClick: () -> Unit,
+    onTogglePin: () -> Unit,
     onDelete: () -> Unit,
 ) {
     Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
@@ -278,6 +288,16 @@ private fun WorkCard(
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.weight(1f).padding(top = 16.dp),
                 )
+                IconButton(onClick = onTogglePin) {
+                    // A pinned work's pin tilts, like one pushed into a board.
+                    val tilt by animateFloatAsState(if (work.pinned) 45f else 0f, label = "pinTilt")
+                    Icon(
+                        if (work.pinned) PinIcons.Filled else PinIcons.Outlined,
+                        contentDescription = if (work.pinned) "Unpin ${work.title}" else "Pin ${work.title} to the top",
+                        tint = if (work.pinned) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                        modifier = Modifier.rotate(tilt),
+                    )
+                }
                 IconButton(onClick = onDelete, enabled = canDelete) {
                     Icon(
                         Icons.Outlined.Delete,

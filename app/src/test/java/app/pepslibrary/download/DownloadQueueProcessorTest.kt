@@ -51,6 +51,9 @@ class DownloadQueueProcessorTest {
         override suspend fun markOpened(workId: Long, at: Long) {
             rows.value[workId]?.let { rows.value = rows.value + (workId to it.copy(lastOpenedAt = at)) }
         }
+        override suspend fun setPinned(workId: Long, pinned: Boolean) {
+            rows.value[workId]?.let { rows.value = rows.value + (workId to it.copy(pinned = pinned)) }
+        }
     }
 
     private val queueDao = FakeQueueDao()

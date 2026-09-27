@@ -32,6 +32,13 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
     }
 }
 
+/** 5 -> 6: adds pinning. Every existing work starts unpinned. */
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `works` ADD COLUMN `pinned` INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
 /**
  * 4 -> 5: adds when each work was last opened. Works already read get the time of their last saved reading position,
  * which is the closest record there is, so the new "Last read" sort is useful straight away.

@@ -1,5 +1,6 @@
 package app.pepslibrary.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -34,4 +35,7 @@ data class WorkEntity(
     val downloadedAt: Long,
     /** Epoch millis the reader last opened this work; null if it never has. Kept across re-downloads. */
     val lastOpenedAt: Long? = null,
+    /** Pinned works stay at the top of the library whatever the sort. Kept across re-downloads. */
+    @ColumnInfo(defaultValue = "0")
+    val pinned: Boolean = false,
 )

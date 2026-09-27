@@ -21,12 +21,18 @@ data class LibraryOrder(val sort: LibrarySort = LibrarySort.OPENED, val reversed
 }
 
 /**
- * Orders the library. Only the chosen key flips when reversed: ties still fall back to newest download first, works
- * never opened stay at the end of a "Last read" sort and works with no known author at the end of an author sort,
- * either way. Titles compare by [titleSortKey]; a plain
- * key rather than java.text.Collator, whose handling of spaces differs between the JVM the tests run on and Android.
+ * Orders the library. Pinned works always come first, ordered among themselves by the same sort. Only the chosen key
+ * flips when reversed: ties still fall back to newest download first, works never opened stay at the end of a
+ * "Last read" sort and works with no known author at the end of an author sort, either way. Titles compare by
+ * [titleSortKey]; a plain key rather than java.text.Collator, whose handling of spaces differs between the JVM the
+ * tests run on and Android.
  */
 fun sortWorks(works: List<WorkEntity>, order: LibraryOrder): List<WorkEntity> {
+    val (pinned, rest) = sortIgnoringPins(works, order).partition { it.pinned }
+    return pinned + rest
+}
+
+private fun sortIgnoringPins(works: List<WorkEntity>, order: LibraryOrder): List<WorkEntity> {
     val newestFirst = compareByDescending<WorkEntity> { it.downloadedAt }
     fun Comparator<WorkEntity>.directed() = if (order.reversed) reversed() else this
     return when (order.sort) {
