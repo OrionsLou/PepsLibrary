@@ -43,7 +43,8 @@ in-app, download whole works as EPUBs, read them offline, and resume exactly whe
   choosing the current option again reverses it. The header shows how much storage the listed works
   use, and each card shows its size and when you last read the work; its pin
   button keeps it at the top of the list whatever the sort. **Filter** narrows the library to pinned works, by completion status
-  (completed, work in progress, or chapter count unknown), by fandom, and by author; they combine.
+  (completed, work in progress, or chapter count unknown), by fandom, and by author; they combine. The chosen
+  sort and filters are remembered across app restarts.
 - Tapping a work in the library opens it in a **reader** built on the [Readium](https://readium.org) toolkit
   (version 3.1.2): swipe or tap the page edges to turn pages, with the title and percent read in a top bar. The
   reading position is saved (as a Readium locator, in Room) when you leave, when the app is stopped, and a second
