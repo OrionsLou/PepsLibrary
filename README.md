@@ -79,7 +79,8 @@ Progress against the phased plan in [HANDOFF.md](HANDOFF.md):
 - [x] 9. WIP updates (keeps your place across re-downloads)
 - [x] 9a. Chapter navigation and position seeking in the reader
 - [x] 10. Library management (delete, sort, filter, pinning, last read, storage usage)
-- [ ] 11. Hardening
+- [ ] 11. Hardening (private session data, cancelling downloads, offline states, saved sort and filter; installs
+  stay on adb, with no published releases)
 - [ ] 12. UI polish and aesthetic tweaks
 
 ## Disclaimer
@@ -115,6 +116,11 @@ written plan rather than ad-hoc prompting:
 Commits made with the agent's help carry a `Co-Authored-By` trailer, so the history shows what it touched.
 
 ## Building
+
+**There are no prebuilt APKs or GitHub Releases.** This is a personal project, so it's distributed as source only:
+I build a signed release APK and install it on my own phone over adb. If you want to use it, build it yourself and
+sign it with your own key (see [Release signing](#release-signing)). That way your install trusts only your key, not
+mine.
 
 Requires Android Studio (bundled JDK 21) and the Android SDK (platform 35). The system JDK on PATH may be too new for
 this Gradle/AGP combination, so point `JAVA_HOME` at Android Studio's JBR:
@@ -154,7 +160,14 @@ keyAlias=pepslibrary
 keyPassword=...
 ```
 
-If that file is missing, `assembleRelease` still builds but produces an **unsigned** APK.
+If that file is missing, `assembleRelease` still builds but produces an **unsigned** APK, which won't install.
+
+To create your own keystore, use the `keytool` bundled with Android Studio's JBR, then fill in the properties file
+above with the passwords you chose:
+
+```powershell
+& "C:\Program Files\Android\Android Studio\jbr\bin\keytool.exe" -genkeypair -v -keystore "$HOME\.pepslibrary\pepslibrary-release.jks" -alias pepslibrary -keyalg RSA -keysize 4096 -validity 10000
+```
 
 **Back up `pepslibrary-release.jks` and `keystore.properties` somewhere safe.** Android only allows in-place updates
 when the APK is signed with the same key; losing it means uninstalling the app and losing local data.
