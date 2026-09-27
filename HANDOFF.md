@@ -99,7 +99,7 @@ The order gets a working read-offline loop early, then adds convenience on top. 
    - the chapter can't be found → start of the work, with a banner.
 
    Chosen over text-anchored bookmarks (store the sentence at the top of the page and search for it after an update), which were considered and dropped as a much larger lift: Readium selection plumbing, sentence segmentation, text normalization and duplicate-match handling, for little gain once chapter navigation (step 9a) covers the remaining gaps by hand. The banner is a `notice` column on `reading_progress` (migration 3→4); any normal save replaces the row without it, so it shows once. Verified on the emulator with a real re-download of a real WIP against planted "older" copies: an edited current chapter (→ chapter start, banner) and an inserted earlier chapter (→ exact spot in the renumbered file).
-9a. **Chapter navigation and position seeking.** *(Added 2026-09-26 as the follow-up to step 9.)* In the reader, a chapter list from Readium's `publication.tableOfContents` (it will include Preface and Afterword) that jumps with `navigator.go(link)`, and a way to seek to a point in the work. Seek by Readium's `publication.positions()` (fixed ~1,024-character slices) or a percentage rather than rendered page numbers, which shift with font size and rotation. Position numbers are recomputed after an update, which is fine for manual navigation.
+9a. **Chapter navigation and position seeking.** *(Added and done 2026-09-26.)* Built as a bottom bar over the page (so it never re-paginates): a slider stepping through Readium positions (about a page each) with a live "chapter · percent" preview that jumps on release, and a Chapters button opening a bottom sheet scrolled to the current chapter. Shown when a work opens; a tap in the middle of the page toggles it (edge taps still turn pages), and its down arrow or dragging it down closes it. Swipe-up-to-open and a floating corner button were tried and dropped: the swipe was unreliable in practice and the button covered text. Original plan: in the reader, a chapter list from Readium's `publication.tableOfContents` (it will include Preface and Afterword) that jumps with `navigator.go(link)`, and a way to seek to a point in the work. Seek by Readium's `publication.positions()` (fixed ~1,024-character slices) or a percentage rather than rendered page numbers, which shift with font size and rotation. Position numbers are recomputed after an update, which is fine for manual navigation.
 10. **Library management.** Delete works, sort/filter, resume-reading shortcut, storage usage.
 11. **Hardening.** Cookies in encrypted storage, sensible error and offline states, GitHub Releases plus Obtainium for updates.
 12. **UI polish and aesthetic tweaks.** *(Added after hardening.)* A visual pass over the whole app once the features are in place: consistent theming (including dark mode), spacing and typography, app icon and splash, empty and loading states, and replacing the temporary scaffolding UI (such as the Download EPUB bar) with a finished design. Also carries the visible half of step 8: a badge on already-downloaded works in AO3 search/browse results and/or a changed Download bar appearance on a work's own page, using `LibraryRepository.isDownloaded` (already built).
@@ -133,6 +133,15 @@ Observations from hands-on testing of the Phase 1 build, to fold into steps 11 a
 - Do not add chapter-by-chapter scraping, parallel downloads, or any bulk-crawling behavior.
 - Do not commit the keystore or any credentials. Add them to `.gitignore` and document how they are supplied to the build.
 - Ask before adding dependencies beyond the stack above.
+- **Testing on my phone.** Once a change works on the emulator, build a signed release APK and hand it over for a phone test (a release build, not debug: it's signed with the real key, so it installs over my existing copy and keeps my library and reading positions). From the repo root in PowerShell:
+
+  ```powershell
+  $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
+  .\gradlew.bat assembleRelease
+  & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r "C:\Repos\PepsLibrary\app\build\outputs\apk\release\app-release.apk"
+  ```
+
+  The output must be `app-release.apk`; `app-release-unsigned.apk` means the keystore properties weren't found (see the README's release-signing section) and it won't install. The phone needs USB debugging on and must show up in `adb devices`. If the emulator is running too, adb needs a target: add `-s <serial>` from `adb devices`, or close the emulator first.
 
 ## 8. Open questions
 

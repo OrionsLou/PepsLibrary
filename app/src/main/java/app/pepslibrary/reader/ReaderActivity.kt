@@ -7,23 +7,43 @@ import android.util.Log
 import android.view.View
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -33,6 +53,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -54,10 +76,14 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
+import org.readium.r2.navigator.input.InputListener
+import org.readium.r2.navigator.input.TapEvent
 import org.readium.r2.navigator.util.DirectionalNavigationAdapter
 import org.readium.r2.shared.ExperimentalReadiumApi
+import org.readium.r2.shared.publication.Link
 import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.publication.Publication
+import org.readium.r2.shared.publication.services.positions
 import org.readium.r2.shared.util.AbsoluteUrl
 import java.io.File
 import kotlin.math.roundToInt
@@ -80,6 +106,15 @@ class ReaderActivity : FragmentActivity() {
     private var workTitle by mutableStateOf("")
     private var percentRead by mutableStateOf<Int?>(null)
     private var notice by mutableStateOf<PositionNotice?>(null)
+
+    /** Every position in the work (roughly a page each at the default font size); the slider steps through these. */
+    private var positions by mutableStateOf<List<Locator>>(emptyList())
+    private var chapters by mutableStateOf<List<ChapterEntry>>(emptyList())
+    private var chapterLinks: List<Link> = emptyList()
+    private var chapterOfFile by mutableStateOf<Map<String, String?>>(emptyMap())
+    private var current by mutableStateOf<Locator?>(null)
+    private var showControls by mutableStateOf(true)
+    private var showChapters by mutableStateOf(false)
 
     private var workId = -1L
     private var publication: Publication? = null
@@ -110,9 +145,44 @@ class ReaderActivity : FragmentActivity() {
                             when (val s = state) {
                                 State.Loading -> CircularProgressIndicator()
                                 is State.Failed -> Text(s.message, modifier = Modifier.padding(24.dp))
-                                State.Ready -> NavigatorHost()
+                                State.Ready -> {
+                                    NavigatorHost()
+                                    // Drawn over the page rather than beside it, so showing or hiding the controls
+                                    // never makes Readium re-paginate.
+                                    // Fully qualified: inside this Column, the plain name resolves to the
+                                    // ColumnScope overload, which can't be called from within the Box. Shown when a
+                                    // work opens so it's discoverable; a tap in the middle of the page toggles it.
+                                    if (positions.size > 1) {
+                                        androidx.compose.animation.AnimatedVisibility(
+                                            visible = showControls,
+                                            enter = slideInVertically { it },
+                                            exit = slideOutVertically { it },
+                                            modifier = Modifier.align(Alignment.BottomCenter),
+                                        ) {
+                                            ReaderControls(
+                                                positions = positions,
+                                                currentIndex = currentPositionIndex(),
+                                                chapterOf = ::chapterTitleOf,
+                                                onSeek = { navigator?.go(it, animated = false) },
+                                                onOpenChapters = { showChapters = true },
+                                                onClose = { showControls = false },
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
+                    }
+                    if (showChapters) {
+                        ChapterSheet(
+                            chapters = chapters,
+                            currentTitle = current?.let(::chapterTitleOf),
+                            onPick = { index ->
+                                chapterLinks.getOrNull(index)?.let { navigator?.go(it, animated = false) }
+                                showChapters = false
+                            },
+                            onDismiss = { showChapters = false },
+                        )
                     }
                 }
             }
@@ -136,7 +206,7 @@ class ReaderActivity : FragmentActivity() {
         }
 
         val saved = progress.get(workId)
-        percentRead = saved?.totalProgression?.let { (it * 100).roundToInt() }
+        percentRead = percentOf(saved?.totalProgression)
         notice = saved?.notice
 
         when (val opened = withContext(Dispatchers.IO) { EpubOpener.get(this@ReaderActivity).open(file) }) {
@@ -145,7 +215,12 @@ class ReaderActivity : FragmentActivity() {
                 state = State.Failed(opened.message)
             }
             is OpenResult.Opened -> {
-                publication = opened.publication
+                val pub = opened.publication
+                publication = pub
+                chapterLinks = flatten(pub.tableOfContents)
+                chapters = chapterLinks.map { ChapterEntry(it.title?.trim().orEmpty().ifEmpty { "Untitled" }, it.path()) }
+                chapterOfFile = chapterTitlesByFile(pub.readingOrder.map { it.path() }, chapters)
+                positions = withContext(Dispatchers.IO) { pub.positions() }
                 val initial = saved?.let { locatorFromJson(it.locatorJson) }
                 supportFragmentManager.fragmentFactory = EpubNavigatorFactory(opened.publication)
                     .createFragmentFactory(initialLocator = initial, listener = navigatorListener)
@@ -177,16 +252,37 @@ class ReaderActivity : FragmentActivity() {
         }
         val nav = fragments.findFragmentByTag(NAVIGATOR_TAG) as EpubNavigatorFragment
         navigator = nav
-        // Tapping the left or right edge of the page turns it (swiping already works).
+        // Tapping the left or right edge of the page turns it (swiping already works). Listeners are asked in order
+        // and the adapter consumes edge taps, so the second one only ever sees taps in the middle of the page.
         nav.addInputListener(DirectionalNavigationAdapter(nav))
+        nav.addInputListener(object : InputListener {
+            override fun onTap(event: TapEvent): Boolean {
+                showControls = !showControls
+                return true
+            }
+        })
 
         coroutineScope {
-            launch { nav.currentLocator.collect { percentRead = it.locations.totalProgression?.let { p -> (p * 100).roundToInt() } } }
+            launch {
+                nav.currentLocator.collect {
+                    current = it
+                    percentRead = percentOf(it.locations.totalProgression)
+                }
+            }
             // Also save a moment after the reader stops turning pages, in case the process is killed without
             // onStop running.
             launch { nav.currentLocator.debounce(SAVE_DELAY_MS).collect { save(it) } }
         }
     }
+
+    private fun currentPositionIndex(): Int =
+        (current?.locations?.position?.minus(1) ?: 0).coerceIn(0, positions.lastIndex)
+
+    private fun chapterTitleOf(locator: Locator): String? = chapterOfFile[locator.href.path.orEmpty()]
+
+    private fun flatten(links: List<Link>): List<Link> = links.flatMap { listOf(it) + flatten(it.children) }
+
+    private fun Link.path(): String = url().removeFragment().path.orEmpty()
 
     private fun save(locator: Locator) {
         val json = locator.toJSON().toString()
@@ -251,6 +347,106 @@ private fun NoticeBanner(message: String, onClose: () -> Unit) {
             Text(message, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f).padding(vertical = 12.dp))
             IconButton(onClick = onClose) {
                 Icon(Icons.Filled.Close, contentDescription = "Dismiss")
+            }
+        }
+    }
+}
+
+/**
+ * The slider steps through Readium's positions (about a page each at the default font size) and shows the target's
+ * chapter and percent while dragging; the jump happens on release. Single pages are still turned by tap or swipe.
+ */
+@Composable
+private fun ReaderControls(
+    positions: List<Locator>,
+    currentIndex: Int,
+    chapterOf: (Locator) -> String?,
+    onSeek: (Locator) -> Unit,
+    onOpenChapters: () -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var dragIndex by remember { mutableStateOf<Int?>(null) }
+    // Hold the released value until the navigator reports the new position, so the thumb doesn't snap back first.
+    LaunchedEffect(currentIndex) { dragIndex = null }
+    val shownIndex = dragIndex ?: currentIndex
+    val shown = positions[shownIndex]
+
+    Surface(
+        modifier
+            .fillMaxWidth()
+            .pointerInput(Unit) {
+                // Dragging the bar down closes it, like a bottom sheet. The slider's own drags are sideways, so
+                // they never get this far.
+                var travelled = 0f
+                detectVerticalDragGestures(
+                    onDragStart = { travelled = 0f },
+                    onDragEnd = { if (travelled > 48.dp.toPx()) onClose() },
+                ) { _, dy -> travelled += dy }
+            },
+        tonalElevation = 3.dp,
+        shadowElevation = 6.dp,
+    ) {
+        Column(Modifier.padding(start = 16.dp, end = 4.dp, bottom = 4.dp)) {
+            Box(
+                Modifier
+                    .padding(top = 8.dp)
+                    .align(Alignment.CenterHorizontally)
+                    .size(width = 32.dp, height = 4.dp)
+                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(2.dp)),
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    positionLabel(chapterOf(shown), percentOf(shown.locations.totalProgression)),
+                    style = MaterialTheme.typography.labelLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(onClick = onClose) {
+                    Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Hide reading controls")
+                }
+            }
+            Slider(
+                value = shownIndex.toFloat(),
+                onValueChange = { dragIndex = it.roundToInt().coerceIn(0, positions.lastIndex) },
+                onValueChangeFinished = { dragIndex?.let { onSeek(positions[it]) } },
+                valueRange = 0f..positions.lastIndex.toFloat(),
+                modifier = Modifier.padding(end = 12.dp),
+            )
+            TextButton(onClick = onOpenChapters) {
+                Icon(Icons.AutoMirrored.Filled.List, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Chapters")
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ChapterSheet(chapters: List<ChapterEntry>, currentTitle: String?, onPick: (Int) -> Unit, onDismiss: () -> Unit) {
+    val currentIndex = chapters.indexOfFirst { it.title == currentTitle }
+    val list = rememberLazyListState(initialFirstVisibleItemIndex = (currentIndex - 2).coerceAtLeast(0))
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Text(
+            "Chapters",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+        )
+        LazyColumn(state = list, contentPadding = PaddingValues(bottom = 24.dp)) {
+            itemsIndexed(chapters) { index, chapter ->
+                val isCurrent = index == currentIndex
+                Text(
+                    chapter.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
+                    color = if (isCurrent) MaterialTheme.colorScheme.primary else Color.Unspecified,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onPick(index) }
+                        .padding(horizontal = 24.dp, vertical = 14.dp),
+                )
             }
         }
     }
