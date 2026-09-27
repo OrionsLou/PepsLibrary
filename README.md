@@ -84,7 +84,7 @@ Progress against the phased plan in [HANDOFF.md](HANDOFF.md):
 - [x] 9. WIP updates (keeps your place across re-downloads)
 - [x] 9a. Chapter navigation and position seeking in the reader
 - [x] 10. Library management (delete, sort, filter, pinning, last read, storage usage)
-- [ ] 11. Hardening (private session data, cancelling downloads, offline states, saved sort and filter; installs
+- [x] 11. Hardening (private session data, cancelling downloads, offline states, saved sort and filter; installs
   stay on adb, with no published releases)
 - [ ] 12. UI polish and aesthetic tweaks
 
