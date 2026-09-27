@@ -7,18 +7,28 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LibraryFilterTest {
-    private fun work(id: Long, vararg authors: String, published: Int? = null, total: Int? = null) = WorkEntity(
+    private fun work(
+        id: Long,
+        vararg authors: String,
+        published: Int? = null,
+        total: Int? = null,
+        fandoms: List<String> = emptyList(),
+    ) = WorkEntity(
         workId = id, title = "Work $id", authors = authors.toList(), summary = null, rating = null,
-        warnings = emptyList(), categories = emptyList(), fandoms = emptyList(), relationships = emptyList(),
+        warnings = emptyList(), categories = emptyList(), fandoms = fandoms, relationships = emptyList(),
         characters = emptyList(), tags = emptyList(), language = null, words = null, chaptersPublished = published,
         chaptersTotal = total, publishedDate = null, updatedDate = null, sourceUpdatedAt = null,
         epubFileName = "$id.epub", fileSizeBytes = 0, downloadedAt = id,
     )
 
     // Complete, WIP with a planned total, WIP with an unknown total ("3/?"), and unreadable chapter counts.
-    private val solo = work(1, "Spect3rr", published = 3, total = 3)
-    private val coWritten = work(2, "Zed", "Spect3rr", published = 3, total = 10)
-    private val other = work(3, "émile", published = 3, total = null)
+    // Fandoms: one, a crossover, and one with a different wording of the same series; the fourth has none.
+    private val solo = work(1, "Spect3rr", published = 3, total = 3, fandoms = listOf("Harry Potter - J. K. Rowling"))
+    private val coWritten = work(
+        2, "Zed", "Spect3rr", published = 3, total = 10,
+        fandoms = listOf("Batman - All Media Types", "Harry Potter - J. K. Rowling"),
+    )
+    private val other = work(3, "émile", published = 3, total = null, fandoms = listOf("Harry Potter (Movies)"))
     private val unsigned = work(4)
     private val library = listOf(solo, coWritten, other, unsigned)
 
@@ -43,7 +53,7 @@ class LibraryFilterTest {
 
     @Test
     fun noAuthorListedIsItsOwnChoice() {
-        assertEquals(listOf(4L), shown(LibraryFilter(authors = setOf(NO_AUTHOR))))
+        assertEquals(listOf(4L), shown(LibraryFilter(authors = setOf(NONE_LISTED))))
     }
 
     @Test
@@ -62,7 +72,7 @@ class LibraryFilterTest {
                 FilterOption("émile", "émile", 1),
                 FilterOption("Spect3rr", "Spect3rr", 2),
                 FilterOption("Zed", "Zed", 1),
-                FilterOption(NO_AUTHOR, "No author listed", 1),
+                FilterOption(NONE_LISTED, "No author listed", 1),
             ),
             authorOptions(library, LibraryFilter()),
         )
@@ -107,6 +117,50 @@ class LibraryFilterTest {
             statusOptions(library),
         )
         assertEquals(listOf(1, 0, 0), statusOptions(listOf(solo)).map { it.count })
+    }
+
+    @Test
+    fun aFandomMatchesEveryWorkInIt_includingCrossovers() {
+        assertEquals(listOf(1L, 2L), shown(LibraryFilter(fandoms = setOf("Harry Potter - J. K. Rowling"))))
+        assertEquals(listOf(2L), shown(LibraryFilter(fandoms = setOf("Batman - All Media Types"))))
+    }
+
+    @Test
+    fun fandomNamesAreExact_soBookAndMovieFandomsAreSeparate_butBothCanBeSelected() {
+        assertEquals(listOf(3L), shown(LibraryFilter(fandoms = setOf("Harry Potter (Movies)"))))
+        assertEquals(
+            listOf(1L, 2L, 3L),
+            shown(LibraryFilter(fandoms = setOf("Harry Potter (Movies)", "Harry Potter - J. K. Rowling"))),
+        )
+    }
+
+    @Test
+    fun noFandomListedIsItsOwnChoice() {
+        assertEquals(listOf(4L), shown(LibraryFilter(fandoms = setOf(NONE_LISTED))))
+    }
+
+    @Test
+    fun allThreeKindsCombine() {
+        val filter = LibraryFilter()
+            .toggleFandom("Harry Potter - J. K. Rowling")
+            .toggleStatus(CompletionStatus.WIP)
+            .toggleAuthor("Spect3rr")
+        assertEquals(3, filter.selectedCount)
+        assertEquals(listOf(2L), shown(filter))
+        assertEquals(LibraryFilter(authors = setOf("Spect3rr"), statuses = setOf(CompletionStatus.WIP)), filter.toggleFandom("Harry Potter - J. K. Rowling"))
+    }
+
+    @Test
+    fun fandomOptionsListEachFandomAlphabeticallyWithCounts_noneLast() {
+        assertEquals(
+            listOf(
+                FilterOption("Batman - All Media Types", "Batman - All Media Types", 1),
+                FilterOption("Harry Potter (Movies)", "Harry Potter (Movies)", 1),
+                FilterOption("Harry Potter - J. K. Rowling", "Harry Potter - J. K. Rowling", 2),
+                FilterOption(NONE_LISTED, "No fandom listed", 1),
+            ),
+            fandomOptions(library, LibraryFilter()),
+        )
     }
 
     @Test

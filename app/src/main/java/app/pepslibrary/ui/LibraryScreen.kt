@@ -185,6 +185,12 @@ private fun FilterSheet(
                     onFilterChange(filter.toggleStatus(status))
                 }
             }
+            item { FilterSectionHeader("Fandom") }
+            items(fandomOptions(works, filter), key = { "fandom:${it.value}" }) { option ->
+                FilterRow(option, checked = option.value in filter.fandoms) {
+                    onFilterChange(filter.toggleFandom(option.value))
+                }
+            }
             item { FilterSectionHeader("Author") }
             items(authorOptions(works, filter), key = { "author:${it.value}" }) { option ->
                 FilterRow(option, checked = option.value in filter.authors) {
