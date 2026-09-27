@@ -41,6 +41,8 @@ in-app, download whole works as EPUBs, read them offline, and resume exactly whe
   after you stop turning pages, so even a killed app resumes at the same spot. Each library entry shows "Not
   started", "42% read" or "Finished". Links inside a book open in the browser, never inside the reader. A missing
   or damaged file gets a clear message instead of a crash.
+- The reader has a bottom bar for moving around a work: a slider that steps page by page with a chapter and
+  percent preview, and a **Chapters** list that jumps to any chapter. Tap the middle of the page to show or hide it.
 - Re-downloading a work in progress keeps your place. New chapters appended, or edits to other chapters, leave the
   saved position exactly where it was, and if an earlier chapter was added or removed the position follows your
   chapter to its new place in the book. If the chapter you were reading was itself edited, the reader opens at the
@@ -69,7 +71,7 @@ Progress against the phased plan in [HANDOFF.md](HANDOFF.md):
 
 **Phase 3: polish**
 - [x] 9. WIP updates (keeps your place across re-downloads)
-- [ ] 9a. Chapter navigation and position seeking in the reader
+- [x] 9a. Chapter navigation and position seeking in the reader
 - [ ] 10. Library management
 - [ ] 11. Hardening
 - [ ] 12. UI polish and aesthetic tweaks
