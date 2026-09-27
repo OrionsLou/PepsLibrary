@@ -24,7 +24,9 @@ in-app, download whole works as EPUBs, read them offline, and resume exactly whe
   work's queue status live: queued, downloading, retrying with the attempt count, or failed. The queue survives
   the app closing and resumes on reopen, but doesn't keep running once the app is fully closed.
 - The **Downloads** button in the footer opens everything currently queued or failed, for a view across all
-  works rather than just the one you're on. A failed item can be retried or removed from there.
+  works rather than just the one you're on. A failed item can be retried or removed from there, and a
+  download in progress can be cancelled from there or from the work's own page; cancelling never touches an existing
+  copy.
 - Each download is recorded in a local Room database, using metadata read from the work page that was already
   fetched (no extra request): title, authors, summary, rating, warnings, categories, fandoms, relationships,
   characters, tags, language, word and chapter counts, dates, and AO3's `updated_at` for later update checks.

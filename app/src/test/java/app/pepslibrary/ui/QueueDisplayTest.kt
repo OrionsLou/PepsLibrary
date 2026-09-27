@@ -4,6 +4,7 @@ import app.pepslibrary.data.DownloadQueueEntity
 import app.pepslibrary.data.MAX_ATTEMPTS
 import app.pepslibrary.data.QueueStatus
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -53,14 +54,14 @@ class QueueDisplayTest {
         assertEquals("Failed: no epub link", queueStatusLabel(entry(QueueStatus.FAILED, lastFailureMessage = "no epub link")))
     }
 
-    // --- queueButtonEnabled ---
+    // --- queueShowsCancel ---
 
     @Test
-    fun buttonIsDisabledOnlyWhileInProgress() {
-        assertTrue(queueButtonEnabled(null))
-        assertTrue(queueButtonEnabled(entry(QueueStatus.PENDING)))
-        assertTrue(queueButtonEnabled(entry(QueueStatus.FAILED)))
-        assertEquals(false, queueButtonEnabled(entry(QueueStatus.IN_PROGRESS)))
+    fun cancelIsOfferedOnlyWhileInProgress() {
+        assertFalse(queueShowsCancel(null))
+        assertFalse(queueShowsCancel(entry(QueueStatus.PENDING)))
+        assertFalse(queueShowsCancel(entry(QueueStatus.FAILED)))
+        assertTrue(queueShowsCancel(entry(QueueStatus.IN_PROGRESS)))
     }
 
     // --- queueButtonLabel ---

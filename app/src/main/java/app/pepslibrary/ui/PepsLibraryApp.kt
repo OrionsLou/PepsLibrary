@@ -45,21 +45,24 @@ fun PepsLibraryApp() {
     // Started once per process. WebSettings.getDefaultUserAgent gives the same string a WebView would report,
     // without needing a live WebView instance: the queue outlives any one browser page, so it can't borrow the
     // browse screen's WebView the way the single-tap download used to.
-    remember {
+    val processor = remember {
         val downloader = EpubDownloader(
             Ao3Http.createClient(WebSettings.getDefaultUserAgent(context)),
             worksDir,
         )
-        DownloadQueueProcessor(queue, repository, downloader::download) { workId, result ->
+        DownloadQueueProcessor(queue, repository, { workId -> downloader.download(workId, this) }) { workId, result ->
             val before = result.previousChapters
             val after = result.chapters
             if (before != null && after != null) progress.reconcileAfterUpdate(workId, before, after)
-        }.start()
+        }.also { it.start() }
     }
+    // Cancel and Remove are one action: the processor stops the work if it's running, then takes it off the queue.
+    val cancelDownload: (Long) -> Unit = { workId -> scope.launch { processor.cancel(workId) } }
 
     Box(Modifier.fillMaxSize()) {
         BrowseScreen(
             queue = queue,
+            onCancelDownload = cancelDownload,
             onOpenQueue = { showQueue = true },
             onOpenLibrary = { showLibrary = true },
         )
@@ -69,7 +72,7 @@ fun PepsLibraryApp() {
             QueueScreen(
                 entries = entries,
                 onRetry = { workId -> scope.launch { queue.enqueue(workId) } },
-                onRemove = { workId -> scope.launch { queue.remove(workId) } },
+                onRemove = cancelDownload,
                 onBack = { showQueue = false },
             )
         }

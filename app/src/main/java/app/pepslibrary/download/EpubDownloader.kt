@@ -4,6 +4,7 @@ import app.pepslibrary.ao3.Ao3
 import app.pepslibrary.ao3.WorkMetadata
 import app.pepslibrary.epub.EpubChapter
 import app.pepslibrary.epub.EpubChapters
+import okhttp3.Call
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -35,6 +36,9 @@ sealed interface DownloadResult {
         val chapters: List<EpubChapter>? = null,
     ) : DownloadResult
 
+    /** Stopped by [DownloadCanceller.cancel] before the new copy was saved; any existing copy is untouched. */
+    data object Cancelled : DownloadResult
+
     data class Failure(
         val kind: FailureKind,
         val message: String,
@@ -44,20 +48,56 @@ sealed interface DownloadResult {
 }
 
 /**
+ * Lets another thread stop a download mid-request. Cancelling cancels the OkHttp call in flight, which closes its
+ * connection, so even a stalled read ends at once instead of waiting out the read timeout. One per download.
+ */
+class DownloadCanceller {
+    private var cancelled = false
+    private var call: Call? = null
+
+    val isCancelled: Boolean
+        @Synchronized get() = cancelled
+
+    @Synchronized
+    fun cancel() {
+        cancelled = true
+        call?.cancel()
+    }
+
+    /** Tracks [call] as the request in flight, cancelling it straight away if [cancel] already happened. */
+    @Synchronized
+    internal fun track(call: Call): Call {
+        this.call = call
+        if (cancelled) call.cancel()
+        return call
+    }
+}
+
+/**
  * Downloads one work as an EPUB: load the work page, find the EPUB link, fetch it. The EPUB bundles every
  * chapter, so a work costs one download however long it is. Blocking; call it off the main thread. It never
  * retries: queueing, delays and Retry-After handling belong to the download queue.
  */
 class EpubDownloader(private val client: OkHttpClient, private val worksDir: File) {
 
-    fun download(workId: Long): DownloadResult = try {
-        fetchAndSave(workId)
-    } catch (e: IOException) {
-        DownloadResult.Failure(FailureKind.NETWORK, e.message ?: e.javaClass.simpleName)
+    /**
+     * Once the new file has replaced the old one the download counts as done, so a [canceller] cancel that arrives
+     * after that point still returns Success: the caller must save it, or the library would miss a file on disk.
+     */
+    fun download(workId: Long, canceller: DownloadCanceller = DownloadCanceller()): DownloadResult {
+        if (canceller.isCancelled) return DownloadResult.Cancelled
+        return try {
+            fetchAndSave(workId, canceller)
+        } catch (e: IOException) {
+            // A cancelled call surfaces as an IOException ("Canceled", or a closed socket mid-read).
+            if (canceller.isCancelled) DownloadResult.Cancelled
+            else DownloadResult.Failure(FailureKind.NETWORK, e.message ?: e.javaClass.simpleName)
+        }
     }
 
-    private fun fetchAndSave(workId: Long): DownloadResult {
-        val page = client.newCall(Request.Builder().url(Ao3.workUrl(workId)).build()).execute().use { response ->
+    private fun fetchAndSave(workId: Long, canceller: DownloadCanceller): DownloadResult {
+        val pageRequest = Request.Builder().url(Ao3.workUrl(workId)).build()
+        val page = canceller.track(client.newCall(pageRequest)).execute().use { response ->
             failureFor(response, "work page")?.let { return it }
             response.request.url.toString() to response.requireBody().string()
         }
@@ -70,7 +110,7 @@ class EpubDownloader(private val client: OkHttpClient, private val worksDir: Fil
             )
 
         val epubRequest = Request.Builder().url(epubUrl).header("Referer", pageUrl).build()
-        return client.newCall(epubRequest).execute().use { response ->
+        return canceller.track(client.newCall(epubRequest)).execute().use { response ->
             failureFor(response, "EPUB file")?.let { return it }
             save(workId, epubUrl, Ao3.parseWorkMetadata(html), response)
         }
