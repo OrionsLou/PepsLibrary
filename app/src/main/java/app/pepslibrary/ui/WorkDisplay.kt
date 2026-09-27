@@ -30,6 +30,17 @@ internal fun completionStatus(work: WorkEntity): CompletionStatus {
     return if (total != null && published >= total) CompletionStatus.COMPLETED else CompletionStatus.WIP
 }
 
+/**
+ * "31 KB", "1.4 MB". Decimal units (1 KB = 1,000 bytes), as Android's own storage settings use, so the numbers match
+ * what the phone reports for the app. Whole numbers below a megabyte; one decimal place from there.
+ */
+internal fun formatFileSize(bytes: Long): String = when {
+    bytes < 1_000 -> "$bytes B"
+    bytes < 999_500 -> "${(bytes / 1_000.0).roundToInt()} KB"
+    bytes < 999_950_000 -> String.format(Locale.US, "%.1f MB", bytes / 1_000_000.0)
+    else -> String.format(Locale.US, "%.1f GB", bytes / 1_000_000_000.0)
+}
+
 /** "Last read Sep 27, 2026", or null for a work never opened (its card already says "Not started"). */
 internal fun lastReadLabel(lastOpenedAt: Long?, formatDate: (Long) -> String): String? =
     lastOpenedAt?.let { "Last read ${formatDate(it)}" }

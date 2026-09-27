@@ -20,6 +20,20 @@ class WorkDisplayTest {
     )
 
     @Test
+    fun fileSizesUseDecimalUnitsLikeAndroidsStorageSettings() {
+        assertEquals("0 B", formatFileSize(0))
+        assertEquals("999 B", formatFileSize(999))
+        assertEquals("1 KB", formatFileSize(1_000))
+        assertEquals("32 KB", formatFileSize(31_837))
+        assertEquals("426 KB", formatFileSize(426_023))
+        assertEquals("1.0 MB", formatFileSize(999_500)) // not "1000 KB"
+        assertEquals("1.4 MB", formatFileSize(1_430_000))
+        assertEquals("612.3 MB", formatFileSize(612_300_000))
+        assertEquals("1.0 GB", formatFileSize(999_950_000)) // not "1000.0 MB"
+        assertEquals("2.5 GB", formatFileSize(2_500_000_000))
+    }
+
+    @Test
     fun lastReadShowsTheOpenDate_orNothingIfNeverOpened() {
         val format = { millis: Long -> "day $millis" }
         assertEquals("Last read day 1790500000000", lastReadLabel(1790500000000, format))

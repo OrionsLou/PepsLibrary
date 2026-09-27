@@ -37,7 +37,8 @@ in-app, download whole works as EPUBs, read them offline, and resume exactly whe
   and history you were on are kept. Downloading a work again replaces its entry. The trash icon on a work deletes
   it (after a confirmation), along with its file and reading position. The **Sort** menu orders the library by when
   you last opened each work (the default, so what you're reading is on top), date downloaded, title, or author;
-  choosing the current option again reverses it. Each card shows when you last read the work, and its pin
+  choosing the current option again reverses it. The header shows how much storage the listed works
+  use, and each card shows its size and when you last read the work; its pin
   button keeps it at the top of the list whatever the sort. **Filter** narrows the library to pinned works, by completion status
   (completed, work in progress, or chapter count unknown), by fandom, and by author; they combine.
 - Tapping a work in the library opens it in a **reader** built on the [Readium](https://readium.org) toolkit
@@ -77,7 +78,7 @@ Progress against the phased plan in [HANDOFF.md](HANDOFF.md):
 **Phase 3: polish**
 - [x] 9. WIP updates (keeps your place across re-downloads)
 - [x] 9a. Chapter navigation and position seeking in the reader
-- [ ] 10. Library management
+- [x] 10. Library management (delete, sort, filter, pinning, last read, storage usage)
 - [ ] 11. Hardening
 - [ ] 12. UI polish and aesthetic tweaks
 
