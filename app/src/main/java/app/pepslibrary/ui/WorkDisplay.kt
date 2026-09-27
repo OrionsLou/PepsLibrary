@@ -30,6 +30,10 @@ internal fun completionStatus(work: WorkEntity): CompletionStatus {
     return if (total != null && published >= total) CompletionStatus.COMPLETED else CompletionStatus.WIP
 }
 
+/** "Last read Sep 27, 2026", or null for a work never opened (its card already says "Not started"). */
+internal fun lastReadLabel(lastOpenedAt: Long?, formatDate: (Long) -> String): String? =
+    lastOpenedAt?.let { "Last read ${formatDate(it)}" }
+
 /** "by A, B", or null when the work has no known author. */
 internal fun workByline(work: WorkEntity): String? =
     work.authors.takeIf { it.isNotEmpty() }?.joinToString(", ")?.let { "by $it" }

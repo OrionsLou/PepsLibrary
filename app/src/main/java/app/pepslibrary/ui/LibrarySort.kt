@@ -6,7 +6,7 @@ import java.util.Locale
 
 /** Each option's natural direction (newest first, A–Z) and its reverse, as labels. */
 enum class LibrarySort(val label: String, val naturalDirection: String, val reversedDirection: String) {
-    OPENED("Last opened", "most recent first", "least recent first"),
+    OPENED("Last read", "most recent first", "least recent first"),
     DOWNLOADED("Date downloaded", "newest first", "oldest first"),
     TITLE("Title", "A–Z", "Z–A"),
     AUTHOR("Author", "A–Z", "Z–A"),
@@ -22,7 +22,7 @@ data class LibraryOrder(val sort: LibrarySort = LibrarySort.OPENED, val reversed
 
 /**
  * Orders the library. Only the chosen key flips when reversed: ties still fall back to newest download first, works
- * never opened stay at the end of a "Last opened" sort and works with no known author at the end of an author sort,
+ * never opened stay at the end of a "Last read" sort and works with no known author at the end of an author sort,
  * either way. Titles compare by [titleSortKey]; a plain
  * key rather than java.text.Collator, whose handling of spaces differs between the JVM the tests run on and Android.
  */

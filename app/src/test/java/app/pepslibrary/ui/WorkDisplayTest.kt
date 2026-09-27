@@ -20,6 +20,13 @@ class WorkDisplayTest {
     )
 
     @Test
+    fun lastReadShowsTheOpenDate_orNothingIfNeverOpened() {
+        val format = { millis: Long -> "day $millis" }
+        assertEquals("Last read day 1790500000000", lastReadLabel(1790500000000, format))
+        assertEquals(null, lastReadLabel(null, format))
+    }
+
+    @Test
     fun aCompleteMultiChapterWork() {
         assertEquals("8,994 words · 3/3 chapters · Complete", workStatsLine(work(words = 8994, published = 3, total = 3)))
     }
