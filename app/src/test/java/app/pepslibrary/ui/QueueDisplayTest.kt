@@ -54,6 +54,23 @@ class QueueDisplayTest {
         assertEquals("Failed: no epub link", queueStatusLabel(entry(QueueStatus.FAILED, lastFailureMessage = "no epub link")))
     }
 
+    @Test
+    fun offlineWaitingWorksSaySoInsteadOfLookingAboutToRun() {
+        val waiting = "Waiting for a connection. It will download once you're back online."
+        assertEquals(waiting, queueStatusLabel(entry(QueueStatus.PENDING), online = false))
+        assertEquals(waiting, queueStatusLabel(entry(QueueStatus.PENDING, notBeforeMillis = 5), online = false))
+    }
+
+    @Test
+    fun offlineLeavesDownloadingAndFailedLabelsAlone() {
+        assertEquals("Downloading...", queueStatusLabel(entry(QueueStatus.IN_PROGRESS), online = false))
+        assertEquals(
+            "Failed: no epub link",
+            queueStatusLabel(entry(QueueStatus.FAILED, lastFailureMessage = "no epub link"), online = false),
+        )
+        assertNull(queueStatusLabel(null, online = false))
+    }
+
     // --- queueShowsCancel ---
 
     @Test

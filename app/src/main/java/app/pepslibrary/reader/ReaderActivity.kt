@@ -12,6 +12,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -34,6 +35,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -63,6 +66,7 @@ import androidx.fragment.app.FragmentContainerView
 import androidx.fragment.app.commitNow
 import androidx.lifecycle.lifecycleScope
 import app.pepslibrary.AppScope
+import app.pepslibrary.data.DownloadQueueRepository
 import app.pepslibrary.data.AppDatabase
 import app.pepslibrary.data.LibraryRepository
 import app.pepslibrary.data.PositionNotice
@@ -99,7 +103,8 @@ import kotlin.math.roundToInt
 class ReaderActivity : FragmentActivity() {
     private sealed interface State {
         data object Loading : State
-        data class Failed(val message: String) : State
+        /** [canRedownload]: the work is still in the library, so queueing it again can replace a missing or damaged file. */
+        data class Failed(val message: String, val canRedownload: Boolean = false) : State
         data object Ready : State
     }
 
@@ -145,7 +150,7 @@ class ReaderActivity : FragmentActivity() {
                         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                             when (val s = state) {
                                 State.Loading -> CircularProgressIndicator()
-                                is State.Failed -> Text(s.message, modifier = Modifier.padding(24.dp))
+                                is State.Failed -> FailedMessage(s, onRedownload = ::redownload, onBack = ::finish)
                                 State.Ready -> {
                                     NavigatorHost()
                                     // Drawn over the page rather than beside it, so showing or hiding the controls
@@ -192,6 +197,29 @@ class ReaderActivity : FragmentActivity() {
         lifecycleScope.launch { load(db) }
     }
 
+    /**
+     * Queues the work again and returns to the library, where its card shows the download's progress. Runs in
+     * [AppScope] so the enqueue isn't lost as this activity finishes; the queue itself waits for a connection.
+     */
+    private fun redownload() {
+        val queue = DownloadQueueRepository(AppDatabase.get(this).downloadQueueDao())
+        AppScope.launch { queue.enqueue(workId) }
+        finish()
+    }
+
+    @Composable
+    private fun FailedMessage(failed: State.Failed, onRedownload: () -> Unit, onBack: () -> Unit) {
+        Column(
+            Modifier.padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(failed.message)
+            if (failed.canRedownload) Button(onClick = onRedownload) { Text("Download again") }
+            OutlinedButton(onClick = onBack) { Text("Back to library") }
+        }
+    }
+
     private suspend fun load(db: AppDatabase) {
         val work = db.workDao().get(workId)
         if (work == null) {
@@ -202,7 +230,7 @@ class ReaderActivity : FragmentActivity() {
 
         val file = File(File(filesDir, "works"), work.epubFileName)
         if (!file.isFile) {
-            state = State.Failed("The EPUB file is missing. Download the work again.")
+            state = State.Failed("The EPUB file is missing. Download the work again.", canRedownload = true)
             return
         }
 
@@ -213,7 +241,7 @@ class ReaderActivity : FragmentActivity() {
         when (val opened = withContext(Dispatchers.IO) { EpubOpener.get(this@ReaderActivity).open(file) }) {
             is OpenResult.Failed -> {
                 Log.w(TAG, "Could not open $file: ${opened.message}")
-                state = State.Failed(opened.message)
+                state = State.Failed(opened.message, canRedownload = true)
             }
             is OpenResult.Opened -> {
                 val pub = opened.publication

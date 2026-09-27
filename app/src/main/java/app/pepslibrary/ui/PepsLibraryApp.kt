@@ -21,6 +21,7 @@ import app.pepslibrary.data.ReadingProgressRepository
 import app.pepslibrary.download.DownloadQueueProcessor
 import app.pepslibrary.download.EpubDownloader
 import app.pepslibrary.network.Ao3Http
+import app.pepslibrary.network.NetworkMonitor
 import app.pepslibrary.reader.ReaderActivity
 import kotlinx.coroutines.launch
 import java.io.File
@@ -50,7 +51,13 @@ fun PepsLibraryApp() {
             Ao3Http.createClient(WebSettings.getDefaultUserAgent(context)),
             worksDir,
         )
-        DownloadQueueProcessor(queue, repository, { workId -> downloader.download(workId, this) }) { workId, result ->
+        val network = NetworkMonitor.get(context)
+        DownloadQueueProcessor(
+            queue,
+            repository,
+            download = { workId -> downloader.download(workId, this) },
+            isOnline = { network.isOnline.value },
+        ) { workId, result ->
             val before = result.previousChapters
             val after = result.chapters
             if (before != null && after != null) progress.reconcileAfterUpdate(workId, before, after)
@@ -69,8 +76,10 @@ fun PepsLibraryApp() {
 
         if (showQueue) {
             val entries by queue.entries.collectAsState(initial = emptyList())
+            val online by NetworkMonitor.get(context).isOnline.collectAsState()
             QueueScreen(
                 entries = entries,
+                online = online,
                 onRetry = { workId -> scope.launch { queue.enqueue(workId) } },
                 onRemove = cancelDownload,
                 onBack = { showQueue = false },

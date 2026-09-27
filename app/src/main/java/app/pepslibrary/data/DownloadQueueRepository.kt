@@ -12,6 +12,13 @@ import kotlinx.coroutines.flow.Flow
 private val RETRYABLE_KINDS =
     setOf(FailureKind.BOT_CHECK, FailureKind.RATE_LIMITED, FailureKind.SERVER_ERROR, FailureKind.NETWORK)
 
+/**
+ * A network failure while the device is offline says nothing about the work or AO3, only that the connection went
+ * away, so it doesn't use up one of the [MAX_ATTEMPTS]: the work just waits for the connection to come back.
+ * Anything else, or any failure while online, counts as usual.
+ */
+internal fun countsAsAttempt(kind: FailureKind, online: Boolean): Boolean = online || kind != FailureKind.NETWORK
+
 /** Automatic attempts before a retryable failure is treated as terminal: the first try plus this many retries. */
 internal const val MAX_ATTEMPTS = 3
 
@@ -74,6 +81,12 @@ class DownloadQueueRepository(
             ),
         )
     }
+
+    /**
+     * Puts a work that failed only because the device went offline back to waiting, leaving its attempt count and
+     * last failure as they were. It runs again once the processor sees a connection.
+     */
+    suspend fun waitForConnection(workId: Long) = dao.setStatus(workId, QueueStatus.PENDING)
 
     /**
      * Call once at startup, before pulling anything from the queue. A row stuck IN_PROGRESS means the process died
