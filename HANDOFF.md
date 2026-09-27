@@ -2,6 +2,13 @@
 
 > Context file for starting a Claude Code session. Everything here comes from a planning discussion. Items marked **[verify]** are assumptions that should be confirmed against current docs or real behavior before relying on them.
 
+## Status at a glance *(updated 2026-09-27)*
+
+- **Done:** Phase 1 steps 1–5 (the MVP: browse, sign in, download, read offline, resume) plus 3a; Phase 2 steps 6–7 and the data half of 8; Phase 3 steps 9, 9a and 10. Details and decisions are recorded under each step below.
+- **Next:** step 11 (hardening), then step 12 (UI polish, which also carries the visible half of step 8 and the "Notes to revisit" items). Step 5a (toolchain update) is deliberately deferred.
+- **Codebase state:** everything is merged to `develop`; work happens on one `feature/...` branch per PR, which I push and merge myself. Room schema **version 6** (exported under `app/schemas/`, migrations in `data/Migrations.kt`; never use destructive migration). **204** JVM unit tests, all passing. minSdk 26, target/compileSdk 35.
+- **How each change is checked:** unit tests, then the debug build on the emulator (golden path and edge cases, screenshots), then a signed release APK handed over for a phone test, then commit. See "Testing" under section 7.
+
 ## 1. Goal
 
 A personal Android app that wraps https://archiveofourown.org (AO3) so I can:
@@ -78,7 +85,7 @@ The order gets a working read-offline loop early, then adds convenience on top. 
 
 ### Phase 2: Making it pleasant
 
-6. **Download button, own chrome.** *(Revised 2026-09-22 — originally planned as JS-injected buttons on AO3's own pages; changed on reflection to keep AO3's rendered page completely untouched.)* A Download/Save bar appears above the footer only when the current page is a work page (same `workId` detection as before), with the existing Download EPUB button and status text. No DOM injection, no JS bridge, no `addJavascriptInterface`. Only covers the single work page you're viewing, same as before this step; a list-page picker (downloading from search/tag/bookmark pages without opening each work) was considered and deferred, not built. Progress display beyond the status text is left to Phase 3, alongside cancel/abort (see the Phase 3 notes above).
+6. **Download button, own chrome.** *(Revised 2026-09-22 — originally planned as JS-injected buttons on AO3's own pages; changed on reflection to keep AO3's rendered page completely untouched.)* A Download/Save bar appears above the footer only when the current page is a work page (same `workId` detection as before), with the existing Download EPUB button and status text. No DOM injection, no JS bridge, no `addJavascriptInterface`. Only covers the single work page you're viewing, same as before this step; a list-page picker (downloading from search/tag/bookmark pages without opening each work) was considered and deferred, not built. Progress display beyond the status text is left to Phase 3, alongside cancel/abort (see "Notes to revisit in Phase 3" below).
 7. **Download queue.** *(Done 2026-09-23, in four chunks: the Room table, the repository, the processor loop, and the UI.)* Sequential downloads with a delay, `Retry-After` handling on 429s, and queue state persisted in Room so it survives app close (queue state, not active execution: the processor is a process-lifetime coroutine, not WorkManager or a foreground service — see the decision recorded under "Suggested architecture" — so downloads pause if the app is fully closed and resume on reopen, rather than continuing unattended). Automatic retry up to 3 attempts for a retryable failure kind (bot check, rate limit, server error, network), with AO3's own `Retry-After` honored exactly and our own backoff (30s, doubling, capped at 5 minutes) otherwise; a non-retryable failure, or a retryable one past the cap, lands on FAILED for manual retry. Progress beyond status text (queued / downloading / retrying with attempt count / failed) stays deferred to Phase 3, per the existing notes. A Downloads screen (footer button) shows everything queued or failed at once, with Retry and Remove; a work's own page shows just its own entry. Queue rows show "Work `<id>`" rather than a title, since a title isn't known until the work page is actually fetched — deferred as a Phase 3 polish candidate rather than adding a schema column for a cosmetic field.
 8. **"Already downloaded" badges.** *(Split by decision on 2026-09-24.)* Inject a marker on works already in the
    library.
@@ -100,7 +107,7 @@ The order gets a working read-offline loop early, then adds convenience on top. 
 
    Chosen over text-anchored bookmarks (store the sentence at the top of the page and search for it after an update), which were considered and dropped as a much larger lift: Readium selection plumbing, sentence segmentation, text normalization and duplicate-match handling, for little gain once chapter navigation (step 9a) covers the remaining gaps by hand. The banner is a `notice` column on `reading_progress` (migration 3→4); any normal save replaces the row without it, so it shows once. Verified on the emulator with a real re-download of a real WIP against planted "older" copies: an edited current chapter (→ chapter start, banner) and an inserted earlier chapter (→ exact spot in the renumbered file).
 9a. **Chapter navigation and position seeking.** *(Added and done 2026-09-26.)* Built as a bottom bar over the page (so it never re-paginates): a slider stepping through Readium positions (about a page each) with a live "chapter · percent" preview that jumps on release, and a Chapters button opening a bottom sheet scrolled to the current chapter. Shown when a work opens; a tap in the middle of the page toggles it (edge taps still turn pages), and its down arrow or dragging it down closes it. Swipe-up-to-open and a floating corner button were tried and dropped: the swipe was unreliable in practice and the button covered text. Original plan: in the reader, a chapter list from Readium's `publication.tableOfContents` (it will include Preface and Afterword) that jumps with `navigator.go(link)`, and a way to seek to a point in the work. Seek by Readium's `publication.positions()` (fixed ~1,024-character slices) or a percentage rather than rendered page numbers, which shift with font size and rotation. Position numbers are recomputed after an update, which is fine for manual navigation.
-10. **Library management.** Delete works, sort/filter, resume-reading shortcut, storage usage. *(Planned 2026-09-27 as one PR per feature, all from data already stored per work; no schema change or extra AO3 requests.)*
+10. **Library management.** *(Done 2026-09-27.)* Delete works, sort/filter, resume-reading shortcut, storage usage. Planned as one PR per feature, all from data already stored per work and with no extra AO3 requests. The seven planned PRs needed no schema change; the later additions "Last read" (4→5) and pinning (5→6) each added a column.
     1. **Delete** *(done)*: trash icon on each library card, with a confirmation dialog. Removes the row, its reading position (foreign key cascade) and the EPUB file, and first drops any queued or failed re-download so it can't bring the work back. Disabled while that work is actively downloading, as on the Downloads screen.
     2. **Sort by title** *(done)*: a "Sort" menu under the library's title bar, with Date downloaded (newest first, the default and the previous fixed order) and Title. Titles compare case- and accent-insensitively, word by word (a space sorts before letters), and a leading "The"/"A" is not skipped, matching AO3. Uses an explicit sort key rather than `java.text.Collator`, whose treatment of spaces differs between the JVM unit tests and Android. The choice survives closing and reopening the library but not an app restart. Since date downloaded is now an option already, PR 4 is reduced to adding oldest-first.
     3. **Sort by author** *(done)*: an Author option in the Sort menu. By the first listed author (AO3's byline order), compared like titles (case- and accent-insensitive); one author's works by title; works with no known author last. "Anonymous" works group together.
@@ -117,8 +124,6 @@ The order gets a working read-offline loop early, then adds convenience on top. 
     11. **Storage usage** *(done)*: the library header shows the total size of the works listed ("4 works · 463 KB", or "2 of 4 works · 37 KB" while filtered, so it always matches the list), and each card's "Downloaded" line shows that work's size. From the stored `fileSizeBytes`, no disk scan. Decimal units (1 KB = 1,000 bytes), as Android's storage settings use.
 
     **Step 10 is done.** The resume-reading shortcut from the original line wasn't built as its own feature: with "Last read" as the default sort, the work being read is the first card, one tap from the library. Revisit (e.g. a "Continue reading" footer button) only if that proves too slow in practice.
-
-    Filters of different kinds combine (e.g. a fandom plus WIP only); design the filter state for that from PR 5 onward.
 11. **Hardening.** Cookies in encrypted storage, sensible error and offline states, GitHub Releases plus Obtainium for updates.
 12. **UI polish and aesthetic tweaks.** *(Added after hardening.)* A visual pass over the whole app once the features are in place: consistent theming (including dark mode), spacing and typography, app icon and splash, empty and loading states, and replacing the temporary scaffolding UI (such as the Download EPUB bar) with a finished design. Also carries the visible half of step 8: a badge on already-downloaded works in AO3 search/browse results and/or a changed Download bar appearance on a work's own page, using `LibraryRepository.isDownloaded` (already built).
 
@@ -136,22 +141,35 @@ Observations from hands-on testing of the Phase 1 build, to fold into steps 11 a
    - There may be a quiet gap before the first byte while AO3 builds the file, so show a "waiting for AO3" state distinct from "downloading", and distinguish the work-page load from the file transfer.
    - Report progress from the downloader through a callback so the queue (step 7) and the UI can share it.
 4. **Make deleting a work feel less abrupt** *(fits step 12, UI polish)*. Today the card vanishes instantly and the list jumps. Wanted: visible feedback on removal, e.g. the card fading or sliding out while the rest of the list closes the gap smoothly (`LazyColumn` item animations), or a brief "Deleted" message.
+5. **"Not started" next to a "Last read" date** *(fits step 12)*. A work opened but not read past the first page shows both. Possible fix: show "Opened, not started" in that case.
+6. **Library sort and filter reset on app restart** *(small; fits step 11 or 12)*. They survive closing and reopening the library and activity recreation (`rememberSaveable`), but not a full process restart. Persisting them (e.g. SharedPreferences) is roughly ten lines.
+7. **Downloads screen shows "Work `<id>`" instead of a title** *(fits step 12; from step 7)*. A title isn't known until the work page is fetched.
 
 ## 6. Suggested architecture
 
 - **Layers:** UI (Compose screens), data (Room, download storage), network (OkHttp with WebView cookie jar), and an isolated AO3 "adapter" layer holding all selectors, injected JS, and parsing.
 - **Screens:** Browse (WebView), Library, Reader, and a Downloads/queue view (Phase 2).
 - **Cookie jar:** a small OkHttp `CookieJar` that reads from Android's `CookieManager` for the AO3 domain.
-- **Downloads:** a persisted queue (Room) processed by a single worker scoped to the app process — not WorkManager, not a foreground service. See the decision under step 7's open questions below.
+- **Downloads:** a persisted queue (Room) processed by a single worker scoped to the app process — not WorkManager, not a foreground service. See the decision under "Open questions" below.
 
 ## 7. Working agreements for the Claude Code session
 
-- Start with **Phase 1, step 1**, and work in small, verifiable steps. Confirm each step builds and runs on a device or emulator before moving on.
+- Pick up from **"Status at a glance"** at the top, and work in small, verifiable steps: one feature per branch/PR. Confirm each step builds and runs on the emulator, then on my phone, before moving on.
+- Keep this file current as work lands: mark the step *(done)* with the date, record decisions and anything tried and dropped, and update "Status at a glance". Keep the README's "What works today" and roadmap checkboxes in step. Commit messages stay short, with the `Co-Authored-By` trailer.
 - Before writing code that depends on a library or on AO3 behavior marked **[verify]**, check current documentation or test against the real site, rather than assuming.
 - Keep AO3-specific selectors and injected JS in one file.
 - Do not add chapter-by-chapter scraping, parallel downloads, or any bulk-crawling behavior.
 - Do not commit the keystore or any credentials. Add them to `.gitignore` and document how they are supplied to the build.
 - Ask before adding dependencies beyond the stack above.
+- **Testing.** Every change goes through these in order:
+  1. **Unit tests** (plain JUnit on the JVM, no device): `.\gradlew.bat testDebugUnitTest` with `JAVA_HOME` set as below. Put logic worth testing in pure functions (as `LibrarySort.kt`, `LibraryFilter.kt`, `WorkDisplay.kt` and `epub/PositionUpdate.kt` do) so it's testable without Android. `android.util.Log` and `org.json` aren't available in these tests.
+  2. **Emulator** (`Medium_Phone_API_35`, the only AVD). Start it with `& "$env:LOCALAPPDATA\Android\Sdk\emulator\emulator.exe" -avd Medium_Phone_API_35`, wait for `adb shell getprop sys.boot_completed` to return 1, then `adb install -r app\build\outputs\apk\debug\app-debug.apk`. Installing over the existing app keeps its data, which is how migrations get tested on a real database. The emulator's library holds real downloads (a 22-chapter WIP, "The Summers of Draco Malfoy", and "bulbs in the dirt") plus test rows 990001–990003 (reader test book, missing file, corrupt file).
+     - Screenshots from `adb shell screencap` are 1080×2400 but display scaled; multiply displayed coordinates by 1.2 before `adb shell input tap`. More reliable: `adb shell uiautomator dump` and tap the centre of an element's `bounds` (this works for the Compose UI; the WebView's page content isn't in that tree).
+     - Inspect the database by copying `databases/pepslibrary.db` plus its `-wal` and `-shm` files out with `adb exec-out run-as app.pepslibrary cat ...` and opening them with Python's `sqlite3`. To plant test data, edit a copy, checkpoint the WAL, push it back with `run-as ... cp`, and delete the device's stale `-wal`/`-shm` first.
+     - In Git Bash, write device paths as `//sdcard/...` (a single leading slash gets rewritten to a Windows path), and escape `>` in `adb shell input text`.
+     - The emulator's AO3 browsing hits Cloudflare checks sometimes; my phone on a normal connection is the reliable place for anything network-heavy.
+  3. **My phone**, via a signed release build (below).
+  4. If a release build fails with "The process cannot access the file" on a `.dex`, it's a transient Windows file lock; rerun it.
 - **Testing on my phone.** Once a change works on the emulator, build a signed release APK and hand it over for a phone test (a release build, not debug: it's signed with the real key, so it installs over my existing copy and keeps my library and reading positions). From the repo root in PowerShell:
 
   ```powershell
@@ -164,8 +182,8 @@ Observations from hands-on testing of the Phase 1 build, to fold into steps 11 a
 
 ## 8. Open questions
 
-- Minimum Android version to target?
-- Where should downloaded EPUBs live (app-private storage versus a user-visible folder)?
+- ~~Minimum Android version to target?~~ **Settled:** minSdk 26 (Android 8.0), target and compileSdk 35 (set in `app/build.gradle.kts`).
+- ~~Where should downloaded EPUBs live?~~ **Settled in step 3:** app-private storage (`filesDir/works/<workId>.epub`), which is removed with the app and needs no storage permission. The README states that downloaded works stay private on the device.
 - ~~WorkManager versus a simpler foreground service for the download queue?~~ **Decided 2026-09-23:** neither. A
   process-lifetime coroutine (the same pattern as `AppScope`, already used for saving reading position) processes
   a Room-backed queue. Queue *state* survives the app closing and resumes on reopen; downloads do not continue
@@ -175,4 +193,4 @@ Observations from hands-on testing of the Phase 1 build, to fold into steps 11 a
   foreground service's persistent notification is an unwarranted UX cost for work that stays in-app. Revisit only
   if "keeps downloading while fully closed" becomes an actual want; the Room-backed state doesn't need to change
   either way.
-- Should the library also store AO3 metadata (tags, summary, word count) at download time for sorting and filtering? This is deferred to Phase 3 unless wanted earlier.
+- ~~Should the library also store AO3 metadata (tags, summary, word count) at download time?~~ **Done in step 4:** read from the work page the download already fetches (no extra request); step 10's sorting and filtering are built on it.
