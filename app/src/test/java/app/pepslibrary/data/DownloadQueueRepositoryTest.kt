@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -220,5 +221,31 @@ class DownloadQueueRepositoryTest {
         assertEquals(240L, backoffSeconds(4))
         assertEquals(300L, backoffSeconds(5)) // 480 uncapped -> capped to 300
         assertEquals(300L, backoffSeconds(10))
+    }
+
+    // --- offline: countsAsAttempt and waitForConnection ---
+
+    @Test
+    fun onlyANetworkFailureWhileOfflineIsFreeOfCharge() {
+        assertFalse(countsAsAttempt(FailureKind.NETWORK, online = false))
+        assertTrue(countsAsAttempt(FailureKind.NETWORK, online = true))
+        FailureKind.entries.filter { it != FailureKind.NETWORK }.forEach {
+            assertTrue("$it offline should still count", countsAsAttempt(it, online = false))
+        }
+    }
+
+    @Test
+    fun waitingForAConnectionKeepsTheAttemptCountAndLastFailure() = runBlocking {
+        repository.enqueue(42)
+        repository.recordFailure(42, DownloadResult.Failure(FailureKind.SERVER_ERROR, "525"))
+        repository.markInProgress(42)
+
+        repository.waitForConnection(42)
+
+        val row = repository.get(42)!!
+        assertEquals(QueueStatus.PENDING, row.status)
+        assertEquals(1, row.attempts)
+        assertEquals("525", row.lastFailureMessage)
+        assertNull(row.notBeforeMillis) // runs as soon as the connection is back
     }
 }

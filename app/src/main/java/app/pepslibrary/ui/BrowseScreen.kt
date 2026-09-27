@@ -28,6 +28,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -38,10 +39,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import app.pepslibrary.BuildConfig
 import app.pepslibrary.ao3.Ao3
+import app.pepslibrary.network.NetworkMonitor
 import app.pepslibrary.data.DownloadQueueEntity
 import app.pepslibrary.data.DownloadQueueRepository
 import kotlinx.coroutines.flow.map
@@ -65,6 +68,7 @@ fun BrowseScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var currentUrl by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    val online by remember { NetworkMonitor.get(context).isOnline }.collectAsState()
 
     val webView = remember {
         createWebView(
@@ -88,6 +92,11 @@ fun BrowseScreen(
 
     BackHandler(enabled = canGoBack) { goBack() }
 
+    // A page that failed while offline reloads by itself once the connection is back; nothing else is retried.
+    LaunchedEffect(online) {
+        if (online && error != null) refresh()
+    }
+
     Column(modifier.fillMaxSize()) {
         Box(Modifier.fillMaxWidth().weight(1f)) {
             AndroidView(factory = { webView }, modifier = Modifier.fillMaxSize())
@@ -100,7 +109,11 @@ fun BrowseScreen(
             }
 
             error?.let { message ->
-                ErrorOverlay(message = message, onRetry = ::refresh)
+                if (online) {
+                    ErrorOverlay(message = message, onRetry = ::refresh)
+                } else {
+                    OfflineOverlay(onOpenLibrary = onOpenLibrary, onRetry = ::refresh)
+                }
             }
         }
 
@@ -114,6 +127,7 @@ fun BrowseScreen(
 
             DownloadBar(
                 entry = entry,
+                online = online,
                 onDownload = { scope.launch { queue.enqueue(workId) } },
                 onCancel = { onCancelDownload(workId) },
             )
@@ -134,6 +148,7 @@ fun BrowseScreen(
 @Composable
 private fun DownloadBar(
     entry: DownloadQueueEntity?,
+    online: Boolean,
     onDownload: () -> Unit,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
@@ -145,7 +160,7 @@ private fun DownloadBar(
             } else {
                 Button(onClick = onDownload) { Text(queueButtonLabel(entry)) }
             }
-            queueStatusLabel(entry)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+            queueStatusLabel(entry, online)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
         }
     }
 }
@@ -161,6 +176,28 @@ private fun ErrorOverlay(message: String, onRetry: () -> Unit) {
             Text("Couldn't load the page", style = MaterialTheme.typography.titleLarge)
             Text(message, style = MaterialTheme.typography.bodyMedium)
             Button(onClick = onRetry) { Text("Retry") }
+        }
+    }
+}
+
+/** Shown instead of [ErrorOverlay] when the page failed because there's no connection at all. */
+@Composable
+private fun OfflineOverlay(onOpenLibrary: () -> Unit, onRetry: () -> Unit) {
+    Surface(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text("You're offline", style = MaterialTheme.typography.titleLarge)
+            Text(
+                "AO3 needs a connection, but your downloaded works are still in your library. This page reloads by " +
+                    "itself once you're back online.",
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+            )
+            Button(onClick = onOpenLibrary) { Text("Open Library") }
+            OutlinedButton(onClick = onRetry) { Text("Retry") }
         }
     }
 }

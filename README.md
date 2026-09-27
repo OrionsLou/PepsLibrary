@@ -13,7 +13,8 @@ in-app, download whole works as EPUBs, read them offline, and resume exactly whe
 - AO3 loads in a `WebView` with the site's full search, filters and bookmarks. Signing in works and the session
   cookies persist.
 - Navigation stays on AO3: links to other sites open in the system browser.
-- A retry screen is shown when a page fails to load (for example, when offline).
+- A retry screen is shown when a page fails to load. When the device is offline it says so instead, links to the
+  library, and reloads the page by itself once the connection is back.
 - A sticky footer under the browser has back, forward and refresh buttons. Back and forward follow the browsing
   history and are disabled at either end; refresh is the way out of an intermittent Cloudflare error or bot-check
   page, and stays available on the error screen.
@@ -26,7 +27,7 @@ in-app, download whole works as EPUBs, read them offline, and resume exactly whe
 - The **Downloads** button in the footer opens everything currently queued or failed, for a view across all
   works rather than just the one you're on. A failed item can be retried or removed from there, and a
   download in progress can be cancelled from there or from the work's own page; cancelling never touches an existing
-  copy.
+  copy. While offline the queue pauses (without using up its retries) and resumes by itself once reconnected.
 - Each download is recorded in a local Room database, using metadata read from the work page that was already
   fetched (no extra request): title, authors, summary, rating, warnings, categories, fandoms, relationships,
   characters, tags, language, word and chapter counts, dates, and AO3's `updated_at` for later update checks.
@@ -48,7 +49,8 @@ in-app, download whole works as EPUBs, read them offline, and resume exactly whe
   reading position is saved (as a Readium locator, in Room) when you leave, when the app is stopped, and a second
   after you stop turning pages, so even a killed app resumes at the same spot. Each library entry shows "Not
   started", "42% read" or "Finished". Links inside a book open in the browser, never inside the reader. A missing
-  or damaged file gets a clear message instead of a crash.
+  or damaged file gets a clear message instead of a crash, with buttons to download the work again or go back to
+  the library.
 - The reader has a bottom bar for moving around a work: a slider that steps page by page with a chapter and
   percent preview, and a **Chapters** list that jumps to any chapter. Tap the middle of the page to show or hide it.
 - Re-downloading a work in progress keeps your place. New chapters appended, or edits to other chapters, leave the

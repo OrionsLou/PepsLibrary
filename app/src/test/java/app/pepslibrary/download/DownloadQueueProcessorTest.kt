@@ -64,8 +64,15 @@ class DownloadQueueProcessorTest {
 
     private val calls = mutableListOf<Long>()
 
+    private var online = true
+
     private fun processor(download: suspend DownloadCanceller.(Long) -> DownloadResult) =
-        DownloadQueueProcessor(queue, library, download = { workId -> calls += workId; download(workId) })
+        DownloadQueueProcessor(
+            queue,
+            library,
+            download = { workId -> calls += workId; download(workId) },
+            isOnline = { online },
+        )
 
     private fun success(workId: Long) = DownloadResult.Success(
         file = File("/anywhere/works/$workId.epub"),
@@ -271,5 +278,61 @@ class DownloadQueueProcessorTest {
         assertNull(queue.get(10))
         assertNull(workDao.get(10))
         assertEquals("Work 20", workDao.get(20)?.title)
+    }
+
+    // --- offline ---
+
+    @Test
+    fun nothingStartsWhileOffline() = runBlocking {
+        queue.enqueue(42)
+        online = false
+
+        val processed = processor { success(it) }.processNext()
+
+        assertFalse(processed)
+        assertTrue(calls.isEmpty())
+        assertEquals(QueueStatus.PENDING, queue.get(42)?.status)
+    }
+
+    @Test
+    fun aNetworkFailureAfterTheConnectionDroppedDoesNotUseAnAttempt() = runBlocking {
+        queue.enqueue(42)
+
+        processor { online = false; failure(FailureKind.NETWORK) }.processNext() // dropped mid-download
+
+        val row = queue.get(42)!!
+        assertEquals(QueueStatus.PENDING, row.status)
+        assertEquals(0, row.attempts)
+        assertNull(row.notBeforeMillis)
+    }
+
+    @Test
+    fun aNetworkFailureWhileStillOnlineCountsAsUsual() = runBlocking {
+        queue.enqueue(42)
+
+        processor { failure(FailureKind.NETWORK) }.processNext()
+
+        assertEquals(1, queue.get(42)!!.attempts)
+    }
+
+    @Test
+    fun otherFailuresCountEvenIfTheConnectionDropped() = runBlocking {
+        queue.enqueue(42)
+
+        processor { online = false; failure(FailureKind.NO_EPUB_LINK) }.processNext()
+
+        assertEquals(QueueStatus.FAILED, queue.get(42)!!.status)
+    }
+
+    @Test
+    fun theQueueResumesOnceBackOnline() = runBlocking {
+        queue.enqueue(42)
+        online = false
+        val p = processor { success(it) }
+        p.processNext()
+
+        online = true
+        assertTrue(p.processNext())
+        assertEquals("Work 42", workDao.get(42)?.title)
     }
 }

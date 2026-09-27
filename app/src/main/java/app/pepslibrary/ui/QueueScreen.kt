@@ -38,6 +38,7 @@ import app.pepslibrary.data.QueueStatus
 @Composable
 fun QueueScreen(
     entries: List<DownloadQueueEntity>,
+    online: Boolean,
     onRetry: (workId: Long) -> Unit,
     onRemove: (workId: Long) -> Unit,
     onBack: () -> Unit,
@@ -60,6 +61,16 @@ fun QueueScreen(
                 )
             }
 
+            if (!online) {
+                Surface(color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        "You're offline. Downloads are paused and resume by themselves once you're back online.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    )
+                }
+            }
+
             if (entries.isEmpty()) {
                 Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
                     Text(
@@ -73,7 +84,12 @@ fun QueueScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     items(entries, key = { it.workId }) { entry ->
-                        QueueCard(entry, onRetry = { onRetry(entry.workId) }, onRemove = { onRemove(entry.workId) })
+                        QueueCard(
+                            entry,
+                            online,
+                            onRetry = { onRetry(entry.workId) },
+                            onRemove = { onRemove(entry.workId) },
+                        )
                     }
                 }
             }
@@ -82,13 +98,13 @@ fun QueueScreen(
 }
 
 @Composable
-private fun QueueCard(entry: DownloadQueueEntity, onRetry: () -> Unit, onRemove: () -> Unit) {
+private fun QueueCard(entry: DownloadQueueEntity, online: Boolean, onRetry: () -> Unit, onRemove: () -> Unit) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             // No title yet: it's only known once the work page is actually fetched, which hasn't happened (or
             // didn't succeed) for anything shown here. See HANDOFF's phase 3 UI-polish note if this feels too bare.
             Text("Work ${entry.workId}", style = MaterialTheme.typography.titleMedium)
-            queueStatusLabel(entry)?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+            queueStatusLabel(entry, online)?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
 
             // Remove and Cancel are the same action (stop it if running, then take it off the queue); the label
             // just says which one it is for this row.

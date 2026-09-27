@@ -4,6 +4,7 @@ import android.util.Log
 import app.pepslibrary.AppScope
 import app.pepslibrary.data.DownloadQueueRepository
 import app.pepslibrary.data.LibraryRepository
+import app.pepslibrary.data.countsAsAttempt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -29,6 +30,11 @@ class DownloadQueueProcessor(
     private val queue: DownloadQueueRepository,
     private val library: LibraryRepository,
     private val download: suspend DownloadCanceller.(workId: Long) -> DownloadResult,
+    /**
+     * While false, nothing starts: an outage shouldn't burn through every queued work's retry attempts. Checked
+     * again after a network failure, which then doesn't count as an attempt if the connection has gone.
+     */
+    private val isOnline: () -> Boolean = { true },
     /** Runs after a success is saved and dequeued, so a failure here can never leave the work stuck in the queue. */
     private val afterSuccess: suspend (workId: Long, result: DownloadResult.Success) -> Unit = { _, _ -> },
 ) {
@@ -47,6 +53,7 @@ class DownloadQueueProcessor(
 
     /** Downloads the next eligible work, if there is one. Returns whether it processed one, success or failure. */
     suspend fun processNext(): Boolean {
+        if (!isOnline()) return false
         val next = queue.nextEligible() ?: return false
         val canceller = DownloadCanceller()
         // Set before the row shows IN_PROGRESS, which is when the UI starts offering Cancel.
@@ -82,7 +89,9 @@ class DownloadQueueProcessor(
                 queue.remove(workId)
                 afterSuccess(workId, result)
             }
-            is DownloadResult.Failure -> queue.recordFailure(workId, result)
+            is DownloadResult.Failure ->
+                if (countsAsAttempt(result.kind, isOnline())) queue.recordFailure(workId, result)
+                else queue.waitForConnection(workId)
             DownloadResult.Cancelled -> queue.remove(workId)
         }
     }
