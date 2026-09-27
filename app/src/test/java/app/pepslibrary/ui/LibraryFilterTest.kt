@@ -7,17 +7,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LibraryFilterTest {
-    private fun work(id: Long, vararg authors: String) = WorkEntity(
+    private fun work(id: Long, vararg authors: String, published: Int? = null, total: Int? = null) = WorkEntity(
         workId = id, title = "Work $id", authors = authors.toList(), summary = null, rating = null,
         warnings = emptyList(), categories = emptyList(), fandoms = emptyList(), relationships = emptyList(),
-        characters = emptyList(), tags = emptyList(), language = null, words = null, chaptersPublished = null,
-        chaptersTotal = null, publishedDate = null, updatedDate = null, sourceUpdatedAt = null,
+        characters = emptyList(), tags = emptyList(), language = null, words = null, chaptersPublished = published,
+        chaptersTotal = total, publishedDate = null, updatedDate = null, sourceUpdatedAt = null,
         epubFileName = "$id.epub", fileSizeBytes = 0, downloadedAt = id,
     )
 
-    private val solo = work(1, "Spect3rr")
-    private val coWritten = work(2, "Zed", "Spect3rr")
-    private val other = work(3, "émile")
+    // Complete, WIP with a planned total, WIP with an unknown total ("3/?"), and unreadable chapter counts.
+    private val solo = work(1, "Spect3rr", published = 3, total = 3)
+    private val coWritten = work(2, "Zed", "Spect3rr", published = 3, total = 10)
+    private val other = work(3, "émile", published = 3, total = null)
     private val unsigned = work(4)
     private val library = listOf(solo, coWritten, other, unsigned)
 
@@ -65,6 +66,47 @@ class LibraryFilterTest {
             ),
             authorOptions(library, LibraryFilter()),
         )
+    }
+
+    @Test
+    fun completionStatusMatchesTheCardsRule() {
+        assertEquals(CompletionStatus.COMPLETED, completionStatus(solo))
+        assertEquals(CompletionStatus.WIP, completionStatus(coWritten))
+        assertEquals(CompletionStatus.WIP, completionStatus(other)) // "3/?"
+        assertEquals(CompletionStatus.OTHER, completionStatus(unsigned))
+        assertEquals(CompletionStatus.COMPLETED, completionStatus(work(9, published = 4, total = 3)))
+    }
+
+    @Test
+    fun statusFiltersMatchAnySelectedStatus() {
+        assertEquals(listOf(1L), shown(LibraryFilter(statuses = setOf(CompletionStatus.COMPLETED))))
+        assertEquals(listOf(2L, 3L), shown(LibraryFilter(statuses = setOf(CompletionStatus.WIP))))
+        assertEquals(listOf(4L), shown(LibraryFilter(statuses = setOf(CompletionStatus.OTHER))))
+        assertEquals(
+            listOf(1L, 4L),
+            shown(LibraryFilter(statuses = setOf(CompletionStatus.COMPLETED, CompletionStatus.OTHER))),
+        )
+    }
+
+    @Test
+    fun differentKindsCombine_everyActiveKindMustMatch() {
+        val spect3rrWips = LibraryFilter(authors = setOf("Spect3rr"), statuses = setOf(CompletionStatus.WIP))
+        assertEquals(listOf(2L), shown(spect3rrWips))
+        assertEquals(2, spect3rrWips.selectedCount)
+        assertEquals(emptyList<Long>(), shown(spect3rrWips.toggleStatus(CompletionStatus.WIP).toggleStatus(CompletionStatus.OTHER)))
+    }
+
+    @Test
+    fun statusOptionsListAllThreeInOrder_evenAtZero() {
+        assertEquals(
+            listOf(
+                FilterOption("COMPLETED", "Completed", 1),
+                FilterOption("WIP", "Work in progress", 2),
+                FilterOption("OTHER", "Other (chapter count unknown)", 1),
+            ),
+            statusOptions(library),
+        )
+        assertEquals(listOf(1, 0, 0), statusOptions(listOf(solo)).map { it.count })
     }
 
     @Test
