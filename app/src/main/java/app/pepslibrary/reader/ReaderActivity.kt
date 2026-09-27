@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -41,6 +42,7 @@ import androidx.fragment.app.commitNow
 import androidx.lifecycle.lifecycleScope
 import app.pepslibrary.AppScope
 import app.pepslibrary.data.AppDatabase
+import app.pepslibrary.data.PositionNotice
 import app.pepslibrary.data.ReadingProgressRepository
 import app.pepslibrary.ui.isOpenableExternally
 import kotlinx.coroutines.Dispatchers
@@ -77,6 +79,7 @@ class ReaderActivity : FragmentActivity() {
     private var state by mutableStateOf<State>(State.Loading)
     private var workTitle by mutableStateOf("")
     private var percentRead by mutableStateOf<Int?>(null)
+    private var notice by mutableStateOf<PositionNotice?>(null)
 
     private var workId = -1L
     private var publication: Publication? = null
@@ -102,6 +105,7 @@ class ReaderActivity : FragmentActivity() {
                 Surface(Modifier.fillMaxSize()) {
                     Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                         ReaderBar(title = workTitle, percent = percentRead, onClose = ::finish)
+                        notice?.let { NoticeBanner(noticeMessage(it), onClose = { notice = null }) }
                         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                             when (val s = state) {
                                 State.Loading -> CircularProgressIndicator()
@@ -133,6 +137,7 @@ class ReaderActivity : FragmentActivity() {
 
         val saved = progress.get(workId)
         percentRead = saved?.totalProgression?.let { (it * 100).roundToInt() }
+        notice = saved?.notice
 
         when (val opened = withContext(Dispatchers.IO) { EpubOpener.get(this@ReaderActivity).open(file) }) {
             is OpenResult.Failed -> {
@@ -229,6 +234,25 @@ class ReaderActivity : FragmentActivity() {
                 Log.w(TAG, "Ignoring an unreadable saved position", e)
                 null // start from the beginning rather than refuse to open the book
             }
+    }
+}
+
+internal fun noticeMessage(notice: PositionNotice): String = when (notice) {
+    PositionNotice.CHAPTER_CHANGED ->
+        "This chapter was changed in the latest update, so you're at its start rather than your exact spot."
+    PositionNotice.CHAPTER_REMOVED ->
+        "The chapter you were reading isn't in the latest update any more, so you're back at the start of the work."
+}
+
+@Composable
+private fun NoticeBanner(message: String, onClose: () -> Unit) {
+    Surface(color = MaterialTheme.colorScheme.secondaryContainer) {
+        Row(Modifier.fillMaxWidth().padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(message, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f).padding(vertical = 12.dp))
+            IconButton(onClick = onClose) {
+                Icon(Icons.Filled.Close, contentDescription = "Dismiss")
+            }
+        }
     }
 }
 

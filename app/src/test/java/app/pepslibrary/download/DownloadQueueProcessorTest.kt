@@ -112,6 +112,28 @@ class DownloadQueueProcessorTest {
     }
 
     @Test
+    fun afterSuccessRunsOnceTheWorkIsSavedAndDequeued() = runBlocking {
+        queue.enqueue(42)
+        var seen: Triple<Long, Boolean, Boolean>? = null
+
+        DownloadQueueProcessor(queue, library, download = { success(it) }) { workId, _ ->
+            seen = Triple(workId, workDao.get(workId) != null, queue.get(workId) == null)
+        }.processNext()
+
+        assertEquals(Triple(42L, true, true), seen)
+    }
+
+    @Test
+    fun afterSuccessDoesNotRunOnFailure() = runBlocking {
+        queue.enqueue(42)
+        var ran = false
+
+        DownloadQueueProcessor(queue, library, download = { failure(FailureKind.NETWORK) }) { _, _ -> ran = true }.processNext()
+
+        assertFalse(ran)
+    }
+
+    @Test
     fun onFailureRecordsItInTheQueueAndDoesNotTouchTheLibrary() = runBlocking {
         queue.enqueue(42)
 

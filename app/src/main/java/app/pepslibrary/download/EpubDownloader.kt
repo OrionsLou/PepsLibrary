@@ -2,6 +2,8 @@ package app.pepslibrary.download
 
 import app.pepslibrary.ao3.Ao3
 import app.pepslibrary.ao3.WorkMetadata
+import app.pepslibrary.epub.EpubChapter
+import app.pepslibrary.epub.EpubChapters
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -25,6 +27,12 @@ sealed interface DownloadResult {
         val metadata: WorkMetadata,
         /** AO3's `updated_at` for this version of the work, from the download link. */
         val sourceUpdatedAt: Long?,
+        /**
+         * Only for a re-download that replaced a readable copy: the old and new reading order, so a saved position
+         * can be checked against what changed. Null for a first download or if either file couldn't be read.
+         */
+        val previousChapters: List<EpubChapter>? = null,
+        val chapters: List<EpubChapter>? = null,
     ) : DownloadResult
 
     data class Failure(
@@ -80,6 +88,7 @@ class EpubDownloader(private val client: OkHttpClient, private val worksDir: Fil
                     "AO3 returned something that isn't an EPUB (content-type ${response.header("Content-Type")}).",
                 )
             }
+            val previous = if (target.isFile) EpubChapters.read(target) else null
             Files.move(part.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE)
             return DownloadResult.Success(
                 file = target,
@@ -87,6 +96,8 @@ class EpubDownloader(private val client: OkHttpClient, private val worksDir: Fil
                 epubUrl = epubUrl,
                 metadata = metadata,
                 sourceUpdatedAt = Ao3.updatedAtFromDownloadUrl(epubUrl),
+                previousChapters = previous,
+                chapters = previous?.let { EpubChapters.read(target) },
             )
         } finally {
             part.delete() // gone already after a successful move; cleans up any partial or rejected download

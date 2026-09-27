@@ -31,3 +31,10 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
         )
     }
 }
+
+/** 3 -> 4: adds the one-time notice shown when a re-download moved a reading position back. */
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `reading_progress` ADD COLUMN `notice` TEXT")
+    }
+}

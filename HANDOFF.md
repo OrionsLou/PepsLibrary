@@ -48,7 +48,7 @@ Fallback if Kotlin is not wanted: Capacitor or React Native, but EPUB rendering 
 - **Use a release build for daily use.** Debug builds are slower and signed with a throwaway key.
 - **Terms of Service:** review AO3's ToS, keep this personal-use, and do not bulk-crawl.
 - **Android sideloading policy:** Google has been rolling out developer-verification requirements. Installing my own builds on my own device is expected to remain supported **[verify current rules]**.
-- **WIP updates:** re-downloading the EPUB to pick up new chapters should keep the saved reading position, on the assumption that Readium locators are chapter-based and remain valid when chapters are appended **[verify this with a real work-in-progress fic]**.
+- **WIP updates:** *(Checked 2026-09-24 against a real 22-chapter WIP download.)* AO3 builds EPUBs with Calibre, which names content files by their place in the book (`<Title>_split_000.xhtml` preface, `_001` title page, `_002` onward one per chapter, then the afterword), and every id in the package is a fresh sequential number. Appending chapters leaves earlier file names alone, but removing or inserting an earlier chapter silently renumbers every later file, so a Readium locator's href can resolve "successfully" to the wrong chapter. Step 9 handles this by comparing content hashes, not names. Still **[verify]**: that Calibre regenerates an *unchanged* chapter byte-for-byte on a later download. If it doesn't, the only effect is landing at the chapter's start instead of the exact spot; confirm by re-downloading a real WIP after its next update.
 
 ## 5. Feature plan and build order
 
@@ -92,7 +92,14 @@ The order gets a working read-offline loop early, then adds convenience on top. 
 
 ### Phase 3: Polish
 
-9. **WIP updates.** Re-download the EPUB to pick up new chapters while keeping the reading position.
+9. **WIP updates.** *(Done 2026-09-26.)* Re-download the EPUB to pick up new chapters while keeping the reading position. When a download replaces an existing copy, the downloader reads the old and new reading order (each file's zip path, SHA-256 and first heading) before and after the swap, and `reconcilePosition` decides what the saved position becomes:
+   - the chapter is byte-identical at the same path → kept exactly (new chapters appended, or edits to *other* chapters);
+   - identical but under a different file name (an earlier chapter was added or removed) → same spot, new href;
+   - the chapter's content changed → start of that chapter, found by its heading, with a one-time reader banner;
+   - the chapter can't be found → start of the work, with a banner.
+
+   Chosen over text-anchored bookmarks (store the sentence at the top of the page and search for it after an update), which were considered and dropped as a much larger lift: Readium selection plumbing, sentence segmentation, text normalization and duplicate-match handling, for little gain once chapter navigation (step 9a) covers the remaining gaps by hand. The banner is a `notice` column on `reading_progress` (migration 3→4); any normal save replaces the row without it, so it shows once. Verified on the emulator with a real re-download of a real WIP against planted "older" copies: an edited current chapter (→ chapter start, banner) and an inserted earlier chapter (→ exact spot in the renumbered file).
+9a. **Chapter navigation and position seeking.** *(Added 2026-09-26 as the follow-up to step 9.)* In the reader, a chapter list from Readium's `publication.tableOfContents` (it will include Preface and Afterword) that jumps with `navigator.go(link)`, and a way to seek to a point in the work. Seek by Readium's `publication.positions()` (fixed ~1,024-character slices) or a percentage rather than rendered page numbers, which shift with font size and rotation. Position numbers are recomputed after an update, which is fine for manual navigation.
 10. **Library management.** Delete works, sort/filter, resume-reading shortcut, storage usage.
 11. **Hardening.** Cookies in encrypted storage, sensible error and offline states, GitHub Releases plus Obtainium for updates.
 12. **UI polish and aesthetic tweaks.** *(Added after hardening.)* A visual pass over the whole app once the features are in place: consistent theming (including dark mode), spacing and typography, app icon and splash, empty and loading states, and replacing the temporary scaffolding UI (such as the Download EPUB bar) with a finished design. Also carries the visible half of step 8: a badge on already-downloaded works in AO3 search/browse results and/or a changed Download bar appearance on a work's own page, using `LibraryRepository.isDownloaded` (already built).

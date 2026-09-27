@@ -44,7 +44,11 @@ fun PepsLibraryApp() {
             Ao3Http.createClient(WebSettings.getDefaultUserAgent(context)),
             File(context.filesDir, "works"),
         )
-        DownloadQueueProcessor(queue, repository, downloader::download).start()
+        DownloadQueueProcessor(queue, repository, downloader::download) { workId, result ->
+            val before = result.previousChapters
+            val after = result.chapters
+            if (before != null && after != null) progress.reconcileAfterUpdate(workId, before, after)
+        }.start()
     }
 
     Box(Modifier.fillMaxSize()) {

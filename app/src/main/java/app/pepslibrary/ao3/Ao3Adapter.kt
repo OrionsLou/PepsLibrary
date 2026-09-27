@@ -32,6 +32,10 @@ object Ao3 {
     private val ISO_DATE = Regex("^\\d{4}-\\d{2}-\\d{2}$")
     private val UPDATED_AT_PARAM = Regex("[?&]updated_at=(\\d+)")
 
+    // AO3's EPUBs are built by Calibre, one file per chapter, each opening with the chapter's heading
+    // ("Chapter 1: The Maze"), plus Preface and Afterword files. Verified against a real download on 2026-09-26.
+    private const val EPUB_HEADING_SELECTOR = "h1, h2, h3"
+
     /**
      * True for https pages on AO3 itself (including subdomains such as download.archiveofourown.org); anything
      * else must not be loaded inside the app's WebView. Takes a String and uses java.net.URI so it can be unit
@@ -120,6 +124,10 @@ object Ao3 {
             updatedDate = date("status"), // labelled "Updated:" or, once finished, "Completed:"
         )
     }
+
+    /** The first heading in one of an AO3 EPUB's content files, e.g. "Chapter 1: The Maze". Null if it has none. */
+    fun epubChapterHeading(xhtml: String): String? =
+        Jsoup.parse(xhtml).selectFirst(EPUB_HEADING_SELECTOR)?.text()?.trim()?.takeIf { it.isNotEmpty() }
 
     private fun isEpubUrl(url: String): Boolean =
         isAo3Url(url) && URI(url).path.endsWith(".epub", ignoreCase = true)

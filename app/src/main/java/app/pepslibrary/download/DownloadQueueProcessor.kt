@@ -28,6 +28,8 @@ class DownloadQueueProcessor(
     private val queue: DownloadQueueRepository,
     private val library: LibraryRepository,
     private val download: suspend (workId: Long) -> DownloadResult,
+    /** Runs after a success is saved and dequeued, so a failure here can never leave the work stuck in the queue. */
+    private val afterSuccess: suspend (workId: Long, result: DownloadResult.Success) -> Unit = { _, _ -> },
 ) {
     /** Downloads the next eligible work, if there is one. Returns whether it processed one, success or failure. */
     suspend fun processNext(): Boolean {
@@ -47,6 +49,7 @@ class DownloadQueueProcessor(
             is DownloadResult.Success -> {
                 library.saveDownload(next.workId, result)
                 queue.remove(next.workId)
+                afterSuccess(next.workId, result)
             }
             is DownloadResult.Failure -> queue.recordFailure(next.workId, result)
         }
