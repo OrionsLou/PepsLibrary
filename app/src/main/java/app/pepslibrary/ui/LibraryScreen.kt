@@ -12,11 +12,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -24,6 +29,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,6 +54,8 @@ fun LibraryScreen(
     progress: Map<Long, Double?>,
     /** Works being downloaded right now; they can't be deleted until that finishes. */
     downloading: Set<Long>,
+    sort: LibrarySort,
+    onSortChange: (LibrarySort) -> Unit,
     onOpenWork: (workId: Long) -> Unit,
     onDeleteWork: (workId: Long) -> Unit,
     onBack: () -> Unit,
@@ -55,6 +63,9 @@ fun LibraryScreen(
 ) {
     BackHandler(onBack = onBack)
     var confirmDelete by remember { mutableStateOf<WorkEntity?>(null) }
+    val listState = rememberLazyListState()
+    // A new order starts from the top. Otherwise the list keeps whichever card was first in view, now mid-list.
+    LaunchedEffect(sort) { listState.scrollToItem(0) }
 
     confirmDelete?.let { work ->
         AlertDialog(
@@ -88,6 +99,10 @@ fun LibraryScreen(
                 )
             }
 
+            if (works.isNotEmpty()) {
+                SortMenu(sort, onSortChange, Modifier.padding(horizontal = 12.dp))
+            }
+
             if (works.isEmpty()) {
                 Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
                     Text(
@@ -97,10 +112,11 @@ fun LibraryScreen(
                 }
             } else {
                 LazyColumn(
+                    state = listState,
                     contentPadding = PaddingValues(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(works, key = { it.workId }) { work ->
+                    items(sortWorks(works, sort), key = { it.workId }) { work ->
                         WorkCard(
                             work = work,
                             progressLabel = readingProgressLabel(progress[work.workId]),
@@ -110,6 +126,26 @@ fun LibraryScreen(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SortMenu(sort: LibrarySort, onSortChange: (LibrarySort) -> Unit, modifier: Modifier = Modifier) {
+    var expanded by remember { mutableStateOf(false) }
+    Box(modifier) {
+        TextButton(onClick = { expanded = true }) {
+            Text("Sort: ${sort.label}")
+            Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            LibrarySort.entries.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option.label) },
+                    onClick = { onSortChange(option); expanded = false },
+                    trailingIcon = { if (option == sort) Icon(Icons.Filled.Check, contentDescription = "Selected") },
+                )
             }
         }
     }
