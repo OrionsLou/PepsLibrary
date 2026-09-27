@@ -3,10 +3,13 @@ package app.pepslibrary.data
 import app.pepslibrary.download.DownloadResult
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import java.io.File
 
 /** The list of downloaded works. Depends on [WorkDao] only, so it can be tested with a fake. */
 class LibraryRepository(
     private val dao: WorkDao,
+    /** Where the EPUB files named in [WorkEntity.epubFileName] live. */
+    private val worksDir: File,
     private val now: () -> Long = System::currentTimeMillis,
 ) {
     /** Most recently downloaded first. Emits again whenever the table changes. */
@@ -14,6 +17,16 @@ class LibraryRepository(
 
     /** Null if [workId] isn't in the library. Emits again if that changes (e.g. a fresh download lands). */
     fun isDownloaded(workId: Long): Flow<Boolean> = dao.observe(workId).map { it != null }
+
+    /**
+     * Removes a work and its EPUB file. The row goes first, so the library never lists a work whose file is gone; if
+     * the file then can't be deleted, it's only an orphan the next download of that work overwrites.
+     */
+    suspend fun delete(workId: Long) {
+        val work = dao.get(workId) ?: return
+        dao.delete(workId)
+        File(worksDir, work.epubFileName).delete()
+    }
 
     /** Records a finished download. Downloading a work again replaces its row (new metadata, new timestamp). */
     suspend fun saveDownload(workId: Long, result: DownloadResult.Success) {

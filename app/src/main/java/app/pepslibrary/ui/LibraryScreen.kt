@@ -14,13 +14,20 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
@@ -39,11 +46,32 @@ fun LibraryScreen(
     works: List<WorkEntity>,
     /** Fraction read (0.0 to 1.0) for works that have a saved reading position. */
     progress: Map<Long, Double?>,
+    /** Works being downloaded right now; they can't be deleted until that finishes. */
+    downloading: Set<Long>,
     onOpenWork: (workId: Long) -> Unit,
+    onDeleteWork: (workId: Long) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     BackHandler(onBack = onBack)
+    var confirmDelete by remember { mutableStateOf<WorkEntity?>(null) }
+
+    confirmDelete?.let { work ->
+        AlertDialog(
+            onDismissRequest = { confirmDelete = null },
+            title = { Text("Delete this work?") },
+            text = {
+                Text(
+                    "\"${work.title}\" and your reading position will be removed from this phone. " +
+                        "You can download it again from AO3 later.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { onDeleteWork(work.workId); confirmDelete = null }) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text("Cancel") } },
+        )
+    }
 
     // The empty pointerInput swallows touches so they don't fall through to the WebView underneath.
     Surface(modifier.fillMaxSize().pointerInput(Unit) {}) {
@@ -73,7 +101,13 @@ fun LibraryScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     items(works, key = { it.workId }) { work ->
-                        WorkCard(work, readingProgressLabel(progress[work.workId]), onClick = { onOpenWork(work.workId) })
+                        WorkCard(
+                            work = work,
+                            progressLabel = readingProgressLabel(progress[work.workId]),
+                            canDelete = work.workId !in downloading,
+                            onClick = { onOpenWork(work.workId) },
+                            onDelete = { confirmDelete = work },
+                        )
                     }
                 }
             }
@@ -82,30 +116,55 @@ fun LibraryScreen(
 }
 
 @Composable
-private fun WorkCard(work: WorkEntity, progressLabel: String, onClick: () -> Unit) {
+private fun WorkCard(
+    work: WorkEntity,
+    progressLabel: String,
+    canDelete: Boolean,
+    onClick: () -> Unit,
+    onDelete: () -> Unit,
+) {
     Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(work.title, style = MaterialTheme.typography.titleMedium)
-            workByline(work)?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
-            if (work.fandoms.isNotEmpty()) {
+        Column(Modifier.padding(start = 16.dp, end = 4.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(verticalAlignment = Alignment.Top) {
                 Text(
-                    work.fandoms.joinToString(", "),
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    work.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f).padding(top = 16.dp),
                 )
+                IconButton(onClick = onDelete, enabled = canDelete) {
+                    Icon(
+                        Icons.Outlined.Delete,
+                        contentDescription = if (canDelete) "Delete ${work.title}" else "Downloading, can't delete yet",
+                    )
+                }
             }
-            workStatsLine(work).takeIf { it.isNotEmpty() }?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall)
+            Column(Modifier.padding(end = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                WorkDetails(work, progressLabel)
             }
-            Text(progressLabel, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-            work.summary?.let {
-                Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 3, overflow = TextOverflow.Ellipsis)
-            }
-            Text(
-                "Downloaded ${DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(work.downloadedAt))}",
-                style = MaterialTheme.typography.labelSmall,
-            )
         }
     }
+}
+
+@Composable
+private fun WorkDetails(work: WorkEntity, progressLabel: String) {
+    workByline(work)?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+    if (work.fandoms.isNotEmpty()) {
+        Text(
+            work.fandoms.joinToString(", "),
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+    workStatsLine(work).takeIf { it.isNotEmpty() }?.let {
+        Text(it, style = MaterialTheme.typography.bodySmall)
+    }
+    Text(progressLabel, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+    work.summary?.let {
+        Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 3, overflow = TextOverflow.Ellipsis)
+    }
+    Text(
+        "Downloaded ${DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(work.downloadedAt))}",
+        style = MaterialTheme.typography.labelSmall,
+    )
 }

@@ -17,6 +17,10 @@ interface WorkDao {
     @Query("SELECT * FROM works WHERE workId = :workId")
     suspend fun get(workId: Long): WorkEntity?
 
+    /** Its reading position goes with it (foreign key cascade). */
+    @Query("DELETE FROM works WHERE workId = :workId")
+    suspend fun delete(workId: Long)
+
     /** Emits again whenever the row for [workId] appears, changes, or is removed. */
     @Query("SELECT * FROM works WHERE workId = :workId")
     fun observe(workId: Long): Flow<WorkEntity?>

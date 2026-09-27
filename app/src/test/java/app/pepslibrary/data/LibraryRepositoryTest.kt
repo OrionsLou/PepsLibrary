@@ -8,8 +8,12 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 import java.io.File
 
 class LibraryRepositoryTest {
@@ -21,11 +25,15 @@ class LibraryRepositoryTest {
         override fun observeAll(): Flow<List<WorkEntity>> = rows.map { it.values.sortedByDescending { w -> w.downloadedAt } }
         override suspend fun get(workId: Long): WorkEntity? = rows.value[workId]
         override fun observe(workId: Long): Flow<WorkEntity?> = rows.map { it[workId] }
+        override suspend fun delete(workId: Long) { rows.value = rows.value - workId }
     }
+
+    @get:Rule
+    val tmp = TemporaryFolder()
 
     private val dao = FakeWorkDao()
     private var clock = 1_000L
-    private val repository = LibraryRepository(dao) { clock }
+    private val repository by lazy { LibraryRepository(dao, tmp.root) { clock } }
 
     private val fullMetadata = WorkMetadata(
         title = "A Title",
@@ -125,6 +133,34 @@ class LibraryRepositoryTest {
         clock = 2L; repository.saveDownload(3, success(metadata = fullMetadata.copy(title = "Third"), file = "3.epub"))
 
         assertEquals(listOf("Second", "Third", "First"), repository.works.first().map { it.title })
+    }
+
+    @Test
+    fun deletingAWorkRemovesItsRowAndItsFile_andLeavesOthersAlone() = runBlocking {
+        repository.saveDownload(42, success(file = "42.epub"))
+        repository.saveDownload(7, success(file = "7.epub"))
+        val file = File(tmp.root, "42.epub").apply { writeText("epub") }
+        val other = File(tmp.root, "7.epub").apply { writeText("epub") }
+
+        repository.delete(42)
+
+        assertNull(dao.get(42))
+        assertFalse(file.exists())
+        assertEquals(7L, dao.get(7)?.workId)
+        assertTrue(other.exists())
+    }
+
+    @Test
+    fun deletingAWorkWhoseFileIsAlreadyGoneStillRemovesTheRow() = runBlocking {
+        repository.saveDownload(42, success(file = "42.epub"))
+        repository.delete(42)
+        assertNull(dao.get(42))
+    }
+
+    @Test
+    fun deletingAWorkNotInTheLibraryDoesNothing() = runBlocking {
+        repository.delete(99)
+        assertEquals(emptyMap<Long, WorkEntity>(), dao.rows.value)
     }
 
     @Test
