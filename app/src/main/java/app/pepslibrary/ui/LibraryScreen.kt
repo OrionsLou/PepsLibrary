@@ -111,7 +111,11 @@ fun LibraryScreen(
                 }
                 Text("Library", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
                 Text(
-                    workCountLabel(shown = shown.size, total = works.size, filtered = filter.isActive),
+                    listOfNotNull(
+                        workCountLabel(shown = shown.size, total = works.size, filtered = filter.isActive),
+                        // The size of what's listed, so it always matches the list, filtered or not.
+                        shown.takeIf { it.isNotEmpty() }?.let { list -> formatFileSize(list.sumOf { it.fileSizeBytes }) },
+                    ).joinToString(" · "),
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(end = 16.dp),
                 )
@@ -332,5 +336,8 @@ private fun WorkDetails(work: WorkEntity, progressLabel: String) {
     }
     val formatDate = { millis: Long -> DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(millis)) }
     lastReadLabel(work.lastOpenedAt, formatDate)?.let { Text(it, style = MaterialTheme.typography.labelSmall) }
-    Text("Downloaded ${formatDate(work.downloadedAt)}", style = MaterialTheme.typography.labelSmall)
+    Text(
+        "Downloaded ${formatDate(work.downloadedAt)} · ${formatFileSize(work.fileSizeBytes)}",
+        style = MaterialTheme.typography.labelSmall,
+    )
 }
