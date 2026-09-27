@@ -1,5 +1,6 @@
 package app.pepslibrary.download
 
+import app.pepslibrary.epub.TestEpub
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
@@ -267,6 +268,43 @@ class EpubDownloaderTest {
         assertEquals(FailureKind.NETWORK, result.kind)
         assertTrue(result.message, result.message.contains("connection reset"))
         assertFalse(File(worksDir, "$workId.epub").exists())
+    }
+
+    @Test
+    fun aFirstDownloadHasNoChapterComparison() {
+        val result = downloader(::normalSite).download(workId) as DownloadResult.Success
+        assertNull(result.previousChapters)
+        assertNull(result.chapters)
+    }
+
+    @Test
+    fun aRedownloadOverARealEpubReportsTheOldAndNewReadingOrder() {
+        val oldBook = TestEpub.write(tmp.newFile("old.epub"), listOf(Triple("c1.xhtml", "Chapter 1", "one")))
+        val newBook = TestEpub.write(
+            tmp.newFile("new.epub"),
+            listOf(Triple("c1.xhtml", "Chapter 1", "one"), Triple("c2.xhtml", "Chapter 2", "two")),
+        ).readBytes()
+        worksDir.mkdirs()
+        oldBook.copyTo(File(worksDir, "$workId.epub"))
+
+        val result = downloader { request ->
+            if (request.url.encodedPath == epubPath) request.reply(body = newBook, type = "application/epub+zip") else normalSite(request)
+        }.download(workId) as DownloadResult.Success
+
+        assertEquals(listOf("OEBPS/c1.xhtml"), result.previousChapters!!.map { it.path })
+        assertEquals(listOf("OEBPS/c1.xhtml", "OEBPS/c2.xhtml"), result.chapters!!.map { it.path })
+        assertEquals(result.previousChapters!![0], result.chapters!![0])
+    }
+
+    @Test
+    fun aRedownloadOverAnUnreadableCopyStillSucceeds_withoutAComparison() {
+        worksDir.mkdirs()
+        File(worksDir, "$workId.epub").writeBytes(byteArrayOf(9, 9, 9))
+
+        val result = downloader(::normalSite).download(workId) as DownloadResult.Success
+
+        assertNull(result.previousChapters)
+        assertArrayEquals(epubBytes, result.file.readBytes())
     }
 
     @Test

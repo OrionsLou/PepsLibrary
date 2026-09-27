@@ -41,6 +41,11 @@ in-app, download whole works as EPUBs, read them offline, and resume exactly whe
   after you stop turning pages, so even a killed app resumes at the same spot. Each library entry shows "Not
   started", "42% read" or "Finished". Links inside a book open in the browser, never inside the reader. A missing
   or damaged file gets a clear message instead of a crash.
+- Re-downloading a work in progress keeps your place. New chapters appended, or edits to other chapters, leave the
+  saved position exactly where it was, and if an earlier chapter was added or removed the position follows your
+  chapter to its new place in the book. If the chapter you were reading was itself edited, the reader opens at the
+  start of that chapter instead (or at the start of the work if the chapter is gone) and says so in a banner you
+  can close.
 - Tested on a physical Android device. On an emulator, AO3's Cloudflare bot check may block the page, so a real
   device on a normal connection is recommended for testing.
 
@@ -63,7 +68,8 @@ Progress against the phased plan in [HANDOFF.md](HANDOFF.md):
 - [~] 8. "Already downloaded" badges — data-layer check only (`isDownloaded`); visible badge deferred to 12
 
 **Phase 3: polish**
-- [ ] 9. WIP updates
+- [x] 9. WIP updates (keeps your place across re-downloads)
+- [ ] 9a. Chapter navigation and position seeking in the reader
 - [ ] 10. Library management
 - [ ] 11. Hardening
 - [ ] 12. UI polish and aesthetic tweaks

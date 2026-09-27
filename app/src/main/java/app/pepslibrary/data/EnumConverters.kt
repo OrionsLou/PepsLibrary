@@ -20,4 +20,12 @@ object EnumConverters {
     @TypeConverter
     @JvmStatic
     fun toFailureKind(value: String?): FailureKind? = value?.let { FailureKind.valueOf(it) }
+
+    @TypeConverter
+    @JvmStatic
+    fun fromPositionNotice(notice: PositionNotice?): String? = notice?.name
+
+    @TypeConverter
+    @JvmStatic
+    fun toPositionNotice(value: String?): PositionNotice? = value?.let { PositionNotice.valueOf(it) }
 }

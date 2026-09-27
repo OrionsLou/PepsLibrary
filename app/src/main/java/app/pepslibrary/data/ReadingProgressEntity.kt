@@ -27,4 +27,11 @@ data class ReadingProgressEntity(
     val totalProgression: Double?,
     /** Epoch millis of the last save. */
     val updatedAt: Long,
+    /**
+     * Set when a re-download moved this position back; the reader shows it once. Any normal save replaces the row
+     * without it, so it clears itself as soon as reading resumes.
+     */
+    val notice: PositionNotice? = null,
 )
+
+enum class PositionNotice { CHAPTER_CHANGED, CHAPTER_REMOVED }
