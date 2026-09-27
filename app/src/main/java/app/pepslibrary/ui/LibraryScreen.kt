@@ -178,6 +178,13 @@ private fun FilterSheet(
             TextButton(onClick = { onFilterChange(LibraryFilter()) }, enabled = filter.isActive) { Text("Clear all") }
         }
         LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
+            item { FilterSectionHeader("Status") }
+            items(statusOptions(works), key = { "status:${it.value}" }) { option ->
+                val status = CompletionStatus.valueOf(option.value)
+                FilterRow(option, checked = status in filter.statuses) {
+                    onFilterChange(filter.toggleStatus(status))
+                }
+            }
             item { FilterSectionHeader("Author") }
             items(authorOptions(works, filter), key = { "author:${it.value}" }) { option ->
                 FilterRow(option, checked = option.value in filter.authors) {

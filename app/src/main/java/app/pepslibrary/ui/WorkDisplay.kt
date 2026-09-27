@@ -14,6 +14,22 @@ internal fun readingProgressLabel(fraction: Double?): String = when {
     else -> "${(fraction * 100).roundToInt()}% read"
 }
 
+enum class CompletionStatus(val label: String) {
+    COMPLETED("Completed"),
+    WIP("Work in progress"),
+    OTHER("Other (chapter count unknown)"),
+}
+
+/**
+ * A work is finished once every planned chapter is up; with no planned total ("3/?") it is still going. OTHER is a
+ * work whose chapter count couldn't be read from AO3's page at download time.
+ */
+internal fun completionStatus(work: WorkEntity): CompletionStatus {
+    val published = work.chaptersPublished ?: return CompletionStatus.OTHER
+    val total = work.chaptersTotal
+    return if (total != null && published >= total) CompletionStatus.COMPLETED else CompletionStatus.WIP
+}
+
 /** "by A, B", or null when the work has no known author. */
 internal fun workByline(work: WorkEntity): String? =
     work.authors.takeIf { it.isNotEmpty() }?.joinToString(", ")?.let { "by $it" }
@@ -27,8 +43,11 @@ internal fun workStatsLine(work: WorkEntity): String {
     val chapters = published?.let {
         if (it == 1 && total == 1) "1 chapter" else "$it/${total ?: "?"} chapters"
     }
-    // A work is finished once every planned chapter is up. With no planned total ("3/?") it is still going.
-    val status = published?.let { if (total != null && it >= total) "Complete" else "In progress" }
+    val status = when (completionStatus(work)) {
+        CompletionStatus.COMPLETED -> "Complete"
+        CompletionStatus.WIP -> "In progress"
+        CompletionStatus.OTHER -> null
+    }
 
     return listOfNotNull(words, chapters, status).joinToString(" · ")
 }
