@@ -17,6 +17,10 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
 import java.io.IOException
+import java.net.ServerSocket
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import kotlin.concurrent.thread
 
 class EpubDownloaderTest {
     @get:Rule
@@ -315,5 +319,89 @@ class EpubDownloaderTest {
         downloader { it.reply(code = 429) }.download(workId)
 
         assertArrayEquals(epubBytes, existing.readBytes())
+    }
+
+    // --- cancelling ---
+
+    @Test
+    fun aDownloadCancelledBeforeItStartsMakesNoRequest() {
+        val canceller = DownloadCanceller().apply { cancel() }
+
+        val result = downloader(::normalSite).download(workId, canceller)
+
+        assertEquals(DownloadResult.Cancelled, result)
+        assertTrue(requests.isEmpty())
+    }
+
+    @Test
+    fun aCancelBetweenTheWorkPageAndTheEpubStopsBeforeTheFile_andKeepsTheExistingCopy() {
+        worksDir.mkdirs()
+        val existing = File(worksDir, "$workId.epub").apply { writeBytes(byteArrayOf(9, 9, 9)) }
+        val canceller = DownloadCanceller()
+
+        val result = downloader { request ->
+            normalSite(request).also { if (request.url.encodedPath.startsWith("/works/")) canceller.cancel() }
+        }.download(workId, canceller)
+
+        assertEquals(DownloadResult.Cancelled, result)
+        assertArrayEquals(byteArrayOf(9, 9, 9), existing.readBytes())
+        assertEquals(listOf("$workId.epub"), worksDir.list()!!.toList()) // no .part left behind
+    }
+
+    /**
+     * Against a real socket, since that's what Cancel has to beat: the EPUB response sends a few bytes and then
+     * stalls, as a dropped network does. The read timeout is far longer than the test allows, so only an actual
+     * cancel of the connection can end it in time.
+     */
+    @Test
+    fun cancellingAStalledTransferEndsItAtOnce_leavingNoPartFile_andTheExistingCopyIntact() {
+        worksDir.mkdirs()
+        val existing = File(worksDir, "$workId.epub").apply { writeBytes(byteArrayOf(9, 9, 9)) }
+        val server = ServerSocket(0)
+        val stalled = CountDownLatch(1)
+        thread(isDaemon = true) {
+            // One connection per request (Connection: close), so each accept() is the next request.
+            repeat(2) {
+                val socket = server.accept()
+                val reader = socket.getInputStream().bufferedReader()
+                val path = reader.readLine().split(" ")[1]
+                while (reader.readLine().isNotEmpty()) Unit // skip headers
+                val out = socket.getOutputStream()
+                if (path.startsWith("/works/")) {
+                    val body = workPageHtml.toByteArray()
+                    out.write("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: ${body.size}\r\nConnection: close\r\n\r\n".toByteArray())
+                    out.write(body)
+                    out.flush()
+                    socket.close()
+                } else {
+                    out.write("HTTP/1.1 200 OK\r\nContent-Type: application/epub+zip\r\nContent-Length: 1000000\r\nConnection: close\r\n\r\n".toByteArray())
+                    out.write(epubBytes)
+                    out.flush()
+                    stalled.countDown() // and never send the rest
+                }
+            }
+        }
+        val client = OkHttpClient.Builder()
+            .readTimeout(60, TimeUnit.SECONDS)
+            .addInterceptor { chain ->
+                val url = chain.request().url.newBuilder().scheme("http").host("127.0.0.1").port(server.localPort).build()
+                // Only the socket is local: the response still names the AO3 URL, as the downloader expects.
+                chain.proceed(chain.request().newBuilder().url(url).build()).newBuilder().request(chain.request()).build()
+            }
+            .build()
+        val canceller = DownloadCanceller()
+        var result: DownloadResult? = null
+        val download = thread { result = EpubDownloader(client, worksDir).download(workId, canceller) }
+
+        assertTrue("server never reached the stall", stalled.await(10, TimeUnit.SECONDS))
+        Thread.sleep(200) // let the client get into its blocking read
+        canceller.cancel()
+        download.join(5_000)
+
+        assertFalse("download still blocked after cancel", download.isAlive)
+        assertEquals(DownloadResult.Cancelled, result)
+        assertArrayEquals(byteArrayOf(9, 9, 9), existing.readBytes())
+        assertEquals(listOf("$workId.epub"), worksDir.list()!!.toList())
+        server.close()
     }
 }

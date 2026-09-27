@@ -90,15 +90,13 @@ private fun QueueCard(entry: DownloadQueueEntity, onRetry: () -> Unit, onRemove:
             Text("Work ${entry.workId}", style = MaterialTheme.typography.titleMedium)
             queueStatusLabel(entry)?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
 
-            // A running download resolves itself; only a paused (PENDING) or stuck (FAILED) row needs a manual
-            // way out, so nothing is offered while IN_PROGRESS.
-            if (entry.status != QueueStatus.IN_PROGRESS) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (entry.status == QueueStatus.FAILED) {
-                        Button(onClick = onRetry) { Text("Retry now") }
-                    }
-                    OutlinedButton(onClick = onRemove) { Text("Remove") }
+            // Remove and Cancel are the same action (stop it if running, then take it off the queue); the label
+            // just says which one it is for this row.
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (entry.status == QueueStatus.FAILED) {
+                    Button(onClick = onRetry) { Text("Retry now") }
                 }
+                OutlinedButton(onClick = onRemove) { Text(if (queueShowsCancel(entry)) "Cancel" else "Remove") }
             }
         }
     }

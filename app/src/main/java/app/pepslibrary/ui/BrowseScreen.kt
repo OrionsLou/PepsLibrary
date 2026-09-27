@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -52,6 +53,7 @@ private const val TAG = "PepsLibrary"
 @Composable
 fun BrowseScreen(
     queue: DownloadQueueRepository,
+    onCancelDownload: (workId: Long) -> Unit,
     onOpenQueue: () -> Unit,
     onOpenLibrary: () -> Unit,
     modifier: Modifier = Modifier,
@@ -113,6 +115,7 @@ fun BrowseScreen(
             DownloadBar(
                 entry = entry,
                 onDownload = { scope.launch { queue.enqueue(workId) } },
+                onCancel = { onCancelDownload(workId) },
             )
         }
 
@@ -129,10 +132,19 @@ fun BrowseScreen(
 }
 
 @Composable
-private fun DownloadBar(entry: DownloadQueueEntity?, onDownload: () -> Unit, modifier: Modifier = Modifier) {
+private fun DownloadBar(
+    entry: DownloadQueueEntity?,
+    onDownload: () -> Unit,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Surface(modifier = modifier.fillMaxWidth(), tonalElevation = 6.dp) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = onDownload, enabled = queueButtonEnabled(entry)) { Text(queueButtonLabel(entry)) }
+            if (queueShowsCancel(entry)) {
+                OutlinedButton(onClick = onCancel) { Text("Cancel download") }
+            } else {
+                Button(onClick = onDownload) { Text(queueButtonLabel(entry)) }
+            }
             queueStatusLabel(entry)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
         }
     }

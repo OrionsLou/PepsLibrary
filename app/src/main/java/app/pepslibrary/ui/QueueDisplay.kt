@@ -15,8 +15,8 @@ internal fun queueStatusLabel(entry: DownloadQueueEntity?): String? = when {
     else -> "Queued, waiting its turn..."
 }
 
-/** Downloading disables the button; everything else (not queued, waiting, failed) can be (re-)started by tapping it. */
-internal fun queueButtonEnabled(entry: DownloadQueueEntity?): Boolean = entry?.status != QueueStatus.IN_PROGRESS
+/** While a work is downloading, its button is Cancel; otherwise (not queued, waiting, failed) it (re-)starts it. */
+internal fun queueShowsCancel(entry: DownloadQueueEntity?): Boolean = entry?.status == QueueStatus.IN_PROGRESS
 
 /** "Download EPUB" normally; "Retry download" once it's landed on FAILED, since tapping re-enqueues it. */
 internal fun queueButtonLabel(entry: DownloadQueueEntity?): String =

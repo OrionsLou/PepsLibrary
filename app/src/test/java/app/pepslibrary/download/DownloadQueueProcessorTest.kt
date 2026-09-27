@@ -64,7 +64,7 @@ class DownloadQueueProcessorTest {
 
     private val calls = mutableListOf<Long>()
 
-    private fun processor(download: suspend (Long) -> DownloadResult) =
+    private fun processor(download: suspend DownloadCanceller.(Long) -> DownloadResult) =
         DownloadQueueProcessor(queue, library, download = { workId -> calls += workId; download(workId) })
 
     private fun success(workId: Long) = DownloadResult.Success(
@@ -188,5 +188,88 @@ class DownloadQueueProcessorTest {
         assertEquals(QueueStatus.PENDING, row.status)
         assertEquals(FailureKind.NETWORK, row.lastFailureKind)
         assertEquals("boom", row.lastFailureMessage)
+    }
+
+    // --- cancelling ---
+
+    @Test
+    fun cancellingTheRunningDownloadStopsIt_andRemovesItWithoutSavingOrRetrying() = runBlocking {
+        queue.enqueue(42)
+        var afterSuccessRan = false
+        lateinit var p: DownloadQueueProcessor
+        p = DownloadQueueProcessor(queue, library, download = { workId ->
+            p.cancel(workId) // tapped while this download is running
+            if (isCancelled) DownloadResult.Cancelled else success(workId)
+        }) { _, _ -> afterSuccessRan = true }
+
+        assertTrue(p.processNext())
+
+        assertNull(queue.get(42))
+        assertNull(workDao.get(42))
+        assertFalse(afterSuccessRan)
+    }
+
+    @Test
+    fun aRunningDownloadStaysListedUntilItHasActuallyStopped() = runBlocking {
+        queue.enqueue(42)
+        var rowDuringCancel: QueueStatus? = null
+        lateinit var p: DownloadQueueProcessor
+        p = processor { workId ->
+            p.cancel(workId)
+            rowDuringCancel = queue.get(workId)?.status
+            DownloadResult.Cancelled
+        }
+
+        p.processNext()
+
+        assertEquals(QueueStatus.IN_PROGRESS, rowDuringCancel)
+        assertNull(queue.get(42))
+    }
+
+    @Test
+    fun aDownloadThatFinishesDespiteALateCancelIsStillSaved() = runBlocking {
+        queue.enqueue(42)
+
+        processor { workId -> cancel(); success(workId) }.processNext() // the file was already in place
+
+        assertEquals("Work 42", workDao.get(42)?.title)
+        assertNull(queue.get(42))
+    }
+
+    @Test
+    fun aFailureRacingACancelIsNotQueuedForRetry() = runBlocking {
+        queue.enqueue(42)
+
+        processor { cancel(); failure(FailureKind.NETWORK) }.processNext()
+
+        assertNull(queue.get(42))
+    }
+
+    @Test
+    fun cancellingAWorkThatIsNotRunningJustRemovesIt() = runBlocking {
+        queue.enqueue(42)
+        queue.recordFailure(42, failure(FailureKind.NO_EPUB_LINK)) // sitting at FAILED
+
+        processor { success(it) }.cancel(42)
+
+        assertNull(queue.get(42))
+        assertTrue(calls.isEmpty())
+    }
+
+    @Test
+    fun cancellingOneWorkLeavesTheNextToDownloadNormally() = runBlocking {
+        clock = 1L; queue.enqueue(10)
+        clock = 2L; queue.enqueue(20)
+        lateinit var p: DownloadQueueProcessor
+        p = processor { workId ->
+            if (workId == 10L) { p.cancel(10); DownloadResult.Cancelled } else success(workId)
+        }
+
+        p.processNext()
+        p.processNext()
+
+        assertNull(queue.get(10))
+        assertNull(workDao.get(10))
+        assertEquals("Work 20", workDao.get(20)?.title)
     }
 }

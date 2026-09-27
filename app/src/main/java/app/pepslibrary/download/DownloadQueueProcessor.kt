@@ -22,21 +22,50 @@ private const val IDLE_POLL_MS = 3_000L
 
 /**
  * Drains the download queue one work at a time. [download] is a plain function rather than [EpubDownloader]
- * itself, so this can be unit-tested without real networking or file I/O.
+ * itself, so this can be unit-tested without real networking or file I/O. Its receiver is that download's own
+ * [DownloadCanceller], which [cancel] uses to stop it.
  */
 class DownloadQueueProcessor(
     private val queue: DownloadQueueRepository,
     private val library: LibraryRepository,
-    private val download: suspend (workId: Long) -> DownloadResult,
+    private val download: suspend DownloadCanceller.(workId: Long) -> DownloadResult,
     /** Runs after a success is saved and dequeued, so a failure here can never leave the work stuck in the queue. */
     private val afterSuccess: suspend (workId: Long, result: DownloadResult.Success) -> Unit = { _, _ -> },
 ) {
+    /** The work downloading right now and its canceller. Guarded by `this`: [cancel] runs on another thread. */
+    private var current: Pair<Long, DownloadCanceller>? = null
+
+    /**
+     * Stops [workId]'s download if it's the one running, and takes it off the queue either way. A running
+     * download is removed once it has actually stopped, so it never shows as gone while still writing its file.
+     * One that finishes before the cancel lands is kept: it's already on disk.
+     */
+    suspend fun cancel(workId: Long) {
+        val running = synchronized(this) { current?.takeIf { it.first == workId }?.second }
+        if (running != null) running.cancel() else queue.remove(workId)
+    }
+
     /** Downloads the next eligible work, if there is one. Returns whether it processed one, success or failure. */
     suspend fun processNext(): Boolean {
         val next = queue.nextEligible() ?: return false
-        queue.markInProgress(next.workId)
-        val result = try {
-            download(next.workId)
+        val canceller = DownloadCanceller()
+        // Set before the row shows IN_PROGRESS, which is when the UI starts offering Cancel.
+        synchronized(this) { current = next.workId to canceller }
+        try {
+            queue.markInProgress(next.workId)
+            val result = runDownload(next.workId, canceller)
+            // A failure racing a cancel (the network dropped just as Cancel was tapped) must not be queued for retry.
+            val cancelled = result is DownloadResult.Failure && canceller.isCancelled
+            handle(next.workId, if (cancelled) DownloadResult.Cancelled else result)
+        } finally {
+            synchronized(this) { current = null }
+        }
+        return true
+    }
+
+    private suspend fun runDownload(workId: Long, canceller: DownloadCanceller): DownloadResult =
+        try {
+            canceller.download(workId)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -45,15 +74,17 @@ class DownloadQueueProcessor(
             // stuck at IN_PROGRESS until the next process restart.
             DownloadResult.Failure(FailureKind.NETWORK, e.message ?: e.javaClass.simpleName)
         }
+
+    private suspend fun handle(workId: Long, result: DownloadResult) {
         when (result) {
             is DownloadResult.Success -> {
-                library.saveDownload(next.workId, result)
-                queue.remove(next.workId)
-                afterSuccess(next.workId, result)
+                library.saveDownload(workId, result)
+                queue.remove(workId)
+                afterSuccess(workId, result)
             }
-            is DownloadResult.Failure -> queue.recordFailure(next.workId, result)
+            is DownloadResult.Failure -> queue.recordFailure(workId, result)
+            DownloadResult.Cancelled -> queue.remove(workId)
         }
-        return true
     }
 
     /**
