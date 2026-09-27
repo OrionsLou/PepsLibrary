@@ -38,7 +38,7 @@ fun PepsLibraryApp() {
     var showLibrary by rememberSaveable { mutableStateOf(false) }
     var showQueue by rememberSaveable { mutableStateOf(false) }
     // Kept here rather than in the library screen, so closing and reopening the library keeps the chosen order.
-    var librarySort by rememberSaveable { mutableStateOf(LibrarySort.DOWNLOADED) }
+    var librarySort by rememberSaveable { mutableStateOf(LibrarySort.OPENED) }
     var librarySortReversed by rememberSaveable { mutableStateOf(false) }
     var libraryFilter by rememberSaveable(stateSaver = LibraryFilterSaver) { mutableStateOf(LibraryFilter()) }
 

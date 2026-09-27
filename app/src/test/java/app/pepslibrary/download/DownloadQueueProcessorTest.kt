@@ -48,6 +48,9 @@ class DownloadQueueProcessorTest {
         override suspend fun get(workId: Long): WorkEntity? = rows.value[workId]
         override fun observe(workId: Long): Flow<WorkEntity?> = rows.map { it[workId] }
         override suspend fun delete(workId: Long) { rows.value = rows.value - workId }
+        override suspend fun markOpened(workId: Long, at: Long) {
+            rows.value[workId]?.let { rows.value = rows.value + (workId to it.copy(lastOpenedAt = at)) }
+        }
     }
 
     private val queueDao = FakeQueueDao()
