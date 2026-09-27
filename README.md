@@ -127,8 +127,16 @@ I build a signed release APK and install it on my own phone over adb. If you wan
 sign it with your own key (see [Release signing](#release-signing)). That way your install trusts only your key, not
 mine.
 
-Requires Android Studio (bundled JDK 21) and the Android SDK (platform 35). The system JDK on PATH may be too new for
-this Gradle/AGP combination, so point `JAVA_HOME` at Android Studio's JBR:
+Requires Android Studio (bundled JDK 21) and the Android SDK (platform 35). To build your own copy from scratch:
+
+1. Install Android Studio, open this project once so it installs SDK platform 35 and writes `local.properties`, then
+   close it.
+2. Create a signing key and `keystore.properties` as described under [Release signing](#release-signing).
+3. Build the release APK as below, and check the output is `app-release.apk`, not `app-release-unsigned.apk`.
+4. On the phone, turn on Developer options and USB debugging, connect it, check it shows in `adb devices`, and
+   install with `adb install -r`.
+
+The system JDK on PATH may be too new for this Gradle/AGP combination, so point `JAVA_HOME` at Android Studio's JBR:
 
 ```powershell
 $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
@@ -139,6 +147,9 @@ $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
 
 Output: `app/build/outputs/apk/release/app-release.apk`. Install with
 `adb install -r app/build/outputs/apk/release/app-release.apk`.
+
+The version is set in one place, `appVersion` in `app/build.gradle.kts`; `versionCode` is worked out from it. Android
+won't install a lower `versionCode` over a higher one, so bump `appVersion` for each new build you put on a device.
 
 ## Testing
 
@@ -167,10 +178,11 @@ keyPassword=...
 
 If that file is missing, `assembleRelease` still builds but produces an **unsigned** APK, which won't install.
 
-To create your own keystore, use the `keytool` bundled with Android Studio's JBR, then fill in the properties file
-above with the passwords you chose:
+To create your own keystore, make the folder, then use the `keytool` bundled with Android Studio's JBR, and fill in
+the properties file above with the passwords you chose:
 
 ```powershell
+New-Item -ItemType Directory -Force "$HOME\.pepslibrary"
 & "C:\Program Files\Android\Android Studio\jbr\bin\keytool.exe" -genkeypair -v -keystore "$HOME\.pepslibrary\pepslibrary-release.jks" -alias pepslibrary -keyalg RSA -keysize 4096 -validity 10000
 ```
 

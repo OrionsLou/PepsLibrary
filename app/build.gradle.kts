@@ -16,6 +16,18 @@ val keystoreProps = Properties().apply {
     if (keystorePropsFile.exists()) keystorePropsFile.inputStream().use { load(it) }
 }
 
+// The one place to change the version: bump appVersion and versionCode follows (major * 10000 + minor * 100 +
+// patch, so 0.2.0 is 200). Android refuses to install a lower versionCode over a higher one, so this also guards
+// against putting an older build on the phone by mistake. Bump it for each feature or step that reaches the phone.
+val appVersion = "0.2.0"
+fun versionCodeOf(name: String): Int {
+    val parts = name.split(".").map { it.toIntOrNull() }
+    require(parts.size == 3 && parts.all { it != null && it >= 0 } && parts[1]!! < 100 && parts[2]!! < 100) {
+        "appVersion must be major.minor.patch with minor and patch under 100, not \"$name\""
+    }
+    return parts[0]!! * 10000 + parts[1]!! * 100 + parts[2]!!
+}
+
 android {
     namespace = "app.pepslibrary"
     compileSdk = 35
@@ -24,8 +36,8 @@ android {
         applicationId = "app.pepslibrary"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = versionCodeOf(appVersion)
+        versionName = appVersion
     }
 
     signingConfigs {
