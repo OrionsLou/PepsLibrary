@@ -64,6 +64,7 @@ import androidx.fragment.app.commitNow
 import androidx.lifecycle.lifecycleScope
 import app.pepslibrary.AppScope
 import app.pepslibrary.data.AppDatabase
+import app.pepslibrary.data.LibraryRepository
 import app.pepslibrary.data.PositionNotice
 import app.pepslibrary.data.ReadingProgressRepository
 import app.pepslibrary.ui.isOpenableExternally
@@ -217,6 +218,8 @@ class ReaderActivity : FragmentActivity() {
             is OpenResult.Opened -> {
                 val pub = opened.publication
                 publication = pub
+                val library = LibraryRepository(db.workDao(), File(filesDir, "works"))
+                AppScope.launch { library.markOpened(workId) }
                 chapterLinks = flatten(pub.tableOfContents)
                 chapters = chapterLinks.map { ChapterEntry(it.title?.trim().orEmpty().ifEmpty { "Untitled" }, it.path()) }
                 chapterOfFile = chapterTitlesByFile(pub.readingOrder.map { it.path() }, chapters)

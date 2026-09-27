@@ -32,6 +32,20 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
     }
 }
 
+/**
+ * 4 -> 5: adds when each work was last opened. Works already read get the time of their last saved reading position,
+ * which is the closest record there is, so the new "Last opened" sort is useful straight away.
+ */
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `works` ADD COLUMN `lastOpenedAt` INTEGER")
+        db.execSQL(
+            "UPDATE `works` SET `lastOpenedAt` = " +
+                "(SELECT `updatedAt` FROM `reading_progress` WHERE `reading_progress`.`workId` = `works`.`workId`)",
+        )
+    }
+}
+
 /** 3 -> 4: adds the one-time notice shown when a re-download moved a reading position back. */
 val MIGRATION_3_4 = object : Migration(3, 4) {
     override fun migrate(db: SupportSQLiteDatabase) {

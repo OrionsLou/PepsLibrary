@@ -5,13 +5,51 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class LibrarySortTest {
-    private fun work(id: Long, title: String, downloadedAt: Long, authors: List<String> = emptyList()) = WorkEntity(
+    private fun work(
+        id: Long,
+        title: String,
+        downloadedAt: Long,
+        authors: List<String> = emptyList(),
+        lastOpenedAt: Long? = null,
+    ) = WorkEntity(
         workId = id, title = title, authors = authors, summary = null, rating = null, warnings = emptyList(),
         categories = emptyList(), fandoms = emptyList(), relationships = emptyList(), characters = emptyList(),
         tags = emptyList(), language = null, words = null, chaptersPublished = null, chaptersTotal = null,
         publishedDate = null, updatedDate = null, sourceUpdatedAt = null, epubFileName = "$id.epub",
-        fileSizeBytes = 0, downloadedAt = downloadedAt,
+        fileSizeBytes = 0, downloadedAt = downloadedAt, lastOpenedAt = lastOpenedAt,
     )
+
+    // Two opened (the older-downloaded one opened most recently), two never opened.
+    private val opened = listOf(
+        work(1, "Read last week", downloadedAt = 10, lastOpenedAt = 100),
+        work(2, "Never opened, new", downloadedAt = 40),
+        work(3, "Reading now", downloadedAt = 5, lastOpenedAt = 300),
+        work(4, "Never opened, old", downloadedAt = 20),
+    )
+
+    @Test
+    fun lastOpenedIsTheDefault() {
+        assertEquals(LibraryOrder(LibrarySort.OPENED, reversed = false), LibraryOrder())
+        assertEquals("Last opened, most recent first", LibraryOrder().label)
+        assertEquals(LibrarySort.OPENED, LibrarySort.entries.first())
+    }
+
+    @Test
+    fun byLastOpenedMostRecentFirst_neverOpenedLastByNewestDownload() {
+        assertEquals(
+            listOf("Reading now", "Read last week", "Never opened, new", "Never opened, old"),
+            titles(opened, LibrarySort.OPENED),
+        )
+    }
+
+    @Test
+    fun byLastOpenedReversedFlipsTheOpenedOnes_butNeverOpenedStayLast() {
+        assertEquals(
+            listOf("Read last week", "Reading now", "Never opened, new", "Never opened, old"),
+            titles(opened, LibrarySort.OPENED, reversed = true),
+        )
+        assertEquals("Last opened, least recent first", LibraryOrder(LibrarySort.OPENED, reversed = true).label)
+    }
 
     private val works = listOf(
         work(1, "bulbs in the dirt", downloadedAt = 30),
@@ -80,7 +118,7 @@ class LibrarySortTest {
 
     @Test
     fun theLabelNamesTheDirection() {
-        assertEquals("Date downloaded, newest first", LibraryOrder().label)
+        assertEquals("Date downloaded, newest first", LibraryOrder(LibrarySort.DOWNLOADED).label)
         assertEquals("Date downloaded, oldest first", LibraryOrder(LibrarySort.DOWNLOADED, reversed = true).label)
         assertEquals("Title, A–Z", LibraryOrder(LibrarySort.TITLE).label)
         assertEquals("Author, Z–A", LibraryOrder(LibrarySort.AUTHOR, reversed = true).label)

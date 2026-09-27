@@ -26,6 +26,9 @@ class LibraryRepositoryTest {
         override suspend fun get(workId: Long): WorkEntity? = rows.value[workId]
         override fun observe(workId: Long): Flow<WorkEntity?> = rows.map { it[workId] }
         override suspend fun delete(workId: Long) { rows.value = rows.value - workId }
+        override suspend fun markOpened(workId: Long, at: Long) {
+            rows.value[workId]?.let { rows.value = rows.value + (workId to it.copy(lastOpenedAt = at)) }
+        }
     }
 
     @get:Rule
@@ -133,6 +136,30 @@ class LibraryRepositoryTest {
         clock = 2L; repository.saveDownload(3, success(metadata = fullMetadata.copy(title = "Third"), file = "3.epub"))
 
         assertEquals(listOf("Second", "Third", "First"), repository.works.first().map { it.title })
+    }
+
+    @Test
+    fun aNewDownloadHasNeverBeenOpened_andOpeningItRecordsTheTime() = runBlocking {
+        repository.saveDownload(42, success())
+        assertNull(dao.get(42)!!.lastOpenedAt)
+
+        clock = 7_000L
+        repository.markOpened(42)
+        assertEquals(7_000L, dao.get(42)!!.lastOpenedAt)
+    }
+
+    @Test
+    fun reDownloadingAWorkKeepsWhenItWasLastOpened() = runBlocking {
+        repository.saveDownload(42, success())
+        clock = 7_000L
+        repository.markOpened(42)
+
+        clock = 9_000L
+        repository.saveDownload(42, success(updatedAt = 1800000000))
+
+        val row = dao.get(42)!!
+        assertEquals(7_000L, row.lastOpenedAt)
+        assertEquals(9_000L, row.downloadedAt)
     }
 
     @Test

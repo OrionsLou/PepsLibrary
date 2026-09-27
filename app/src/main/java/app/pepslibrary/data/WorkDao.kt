@@ -17,6 +17,9 @@ interface WorkDao {
     @Query("SELECT * FROM works WHERE workId = :workId")
     suspend fun get(workId: Long): WorkEntity?
 
+    @Query("UPDATE works SET lastOpenedAt = :at WHERE workId = :workId")
+    suspend fun markOpened(workId: Long, at: Long)
+
     /** Its reading position goes with it (foreign key cascade). */
     @Query("DELETE FROM works WHERE workId = :workId")
     suspend fun delete(workId: Long)

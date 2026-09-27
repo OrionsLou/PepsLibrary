@@ -32,4 +32,6 @@ data class WorkEntity(
     val fileSizeBytes: Long,
     /** Epoch millis of the latest download of this work. */
     val downloadedAt: Long,
+    /** Epoch millis the reader last opened this work; null if it never has. Kept across re-downloads. */
+    val lastOpenedAt: Long? = null,
 )

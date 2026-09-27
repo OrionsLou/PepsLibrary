@@ -6,13 +6,14 @@ import java.util.Locale
 
 /** Each option's natural direction (newest first, A–Z) and its reverse, as labels. */
 enum class LibrarySort(val label: String, val naturalDirection: String, val reversedDirection: String) {
+    OPENED("Last opened", "most recent first", "least recent first"),
     DOWNLOADED("Date downloaded", "newest first", "oldest first"),
     TITLE("Title", "A–Z", "Z–A"),
     AUTHOR("Author", "A–Z", "Z–A"),
 }
 
 /** What the library is ordered by. Choosing the current option again reverses it; another option starts natural. */
-data class LibraryOrder(val sort: LibrarySort = LibrarySort.DOWNLOADED, val reversed: Boolean = false) {
+data class LibraryOrder(val sort: LibrarySort = LibrarySort.OPENED, val reversed: Boolean = false) {
     fun select(option: LibrarySort): LibraryOrder =
         if (option == sort) copy(reversed = !reversed) else LibraryOrder(option)
 
@@ -20,14 +21,20 @@ data class LibraryOrder(val sort: LibrarySort = LibrarySort.DOWNLOADED, val reve
 }
 
 /**
- * Orders the library. Only the chosen key flips when reversed: ties still fall back to newest download first, and
- * works with no known author stay at the end of an author sort either way. Titles compare by [titleSortKey]; a plain
+ * Orders the library. Only the chosen key flips when reversed: ties still fall back to newest download first, works
+ * never opened stay at the end of a "Last opened" sort and works with no known author at the end of an author sort,
+ * either way. Titles compare by [titleSortKey]; a plain
  * key rather than java.text.Collator, whose handling of spaces differs between the JVM the tests run on and Android.
  */
 fun sortWorks(works: List<WorkEntity>, order: LibraryOrder): List<WorkEntity> {
     val newestFirst = compareByDescending<WorkEntity> { it.downloadedAt }
     fun Comparator<WorkEntity>.directed() = if (order.reversed) reversed() else this
     return when (order.sort) {
+        LibrarySort.OPENED -> works.sortedWith(
+            compareBy<WorkEntity> { it.lastOpenedAt == null }
+                .then(compareByDescending<WorkEntity> { it.lastOpenedAt }.directed())
+                .then(newestFirst),
+        )
         LibrarySort.DOWNLOADED -> works.sortedWith(newestFirst.directed())
         LibrarySort.TITLE -> works.sortedWith(compareBy<WorkEntity> { titleSortKey(it.title) }.directed().then(newestFirst))
         // By the first listed author, AO3's byline order; one author's works by title.

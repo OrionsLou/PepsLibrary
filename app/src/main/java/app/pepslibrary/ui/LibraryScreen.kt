@@ -72,9 +72,10 @@ fun LibraryScreen(
     var confirmDelete by remember { mutableStateOf<WorkEntity?>(null) }
     var showFilters by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
-    // A new order or filter starts from the top. Otherwise the list keeps whichever card was first in view.
-    LaunchedEffect(order, filter) { listState.scrollToItem(0) }
     val shown = sortWorks(works.filter(filter::matches), order)
+    // Start from the top when the order, the filter, or the work at the top changes (e.g. the one just read moving
+    // up under "Last opened"). Otherwise the list keeps whichever card was first in view and hides the new top one.
+    LaunchedEffect(order, filter, shown.firstOrNull()?.workId) { listState.scrollToItem(0) }
 
     if (showFilters) {
         FilterSheet(works, filter, onFilterChange, onDismiss = { showFilters = false })
