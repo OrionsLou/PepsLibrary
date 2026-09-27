@@ -37,7 +37,7 @@ in-app, download whole works as EPUBs, read them offline, and resume exactly whe
   and history you were on are kept. Downloading a work again replaces its entry. The trash icon on a work deletes
   it (after a confirmation), along with its file and reading position. The **Sort** menu orders the library by when
   you last opened each work (the default, so what you're reading is on top), date downloaded, title, or author;
-  choosing the current option again reverses it. **Filter** narrows the library by completion status
+  choosing the current option again reverses it. Each card shows when you last read the work. **Filter** narrows the library by completion status
   (completed, work in progress, or chapter count unknown), by fandom, and by author; they combine.
 - Tapping a work in the library opens it in a **reader** built on the [Readium](https://readium.org) toolkit
   (version 3.1.2): swipe or tap the page edges to turn pages, with the title and percent read in a top bar. The

@@ -74,7 +74,7 @@ fun LibraryScreen(
     val listState = rememberLazyListState()
     val shown = sortWorks(works.filter(filter::matches), order)
     // Start from the top when the order, the filter, or the work at the top changes (e.g. the one just read moving
-    // up under "Last opened"). Otherwise the list keeps whichever card was first in view and hides the new top one.
+    // up under "Last read"). Otherwise the list keeps whichever card was first in view and hides the new top one.
     LaunchedEffect(order, filter, shown.firstOrNull()?.workId) { listState.scrollToItem(0) }
 
     if (showFilters) {
@@ -310,8 +310,7 @@ private fun WorkDetails(work: WorkEntity, progressLabel: String) {
     work.summary?.let {
         Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 3, overflow = TextOverflow.Ellipsis)
     }
-    Text(
-        "Downloaded ${DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(work.downloadedAt))}",
-        style = MaterialTheme.typography.labelSmall,
-    )
+    val formatDate = { millis: Long -> DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(millis)) }
+    lastReadLabel(work.lastOpenedAt, formatDate)?.let { Text(it, style = MaterialTheme.typography.labelSmall) }
+    Text("Downloaded ${formatDate(work.downloadedAt)}", style = MaterialTheme.typography.labelSmall)
 }

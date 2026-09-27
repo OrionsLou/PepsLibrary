@@ -28,12 +28,12 @@ class LibraryRepository(
         File(worksDir, work.epubFileName).delete()
     }
 
-    /** Called when the reader opens a work, for the library's "Last opened" sort. */
+    /** Called when the reader opens a work, for the library's "Last read" sort. */
     suspend fun markOpened(workId: Long) = dao.markOpened(workId, now())
 
     /**
      * Records a finished download. Downloading a work again replaces its row (new metadata, new timestamp) but keeps
-     * when it was last opened, so a re-downloaded work doesn't drop down the "Last opened" order.
+     * when it was last opened, so a re-downloaded work doesn't drop down the "Last read" order.
      */
     suspend fun saveDownload(workId: Long, result: DownloadResult.Success) {
         val m = result.metadata

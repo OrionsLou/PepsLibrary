@@ -30,7 +30,7 @@ class LibrarySortTest {
     @Test
     fun lastOpenedIsTheDefault() {
         assertEquals(LibraryOrder(LibrarySort.OPENED, reversed = false), LibraryOrder())
-        assertEquals("Last opened, most recent first", LibraryOrder().label)
+        assertEquals("Last read, most recent first", LibraryOrder().label)
         assertEquals(LibrarySort.OPENED, LibrarySort.entries.first())
     }
 
@@ -48,7 +48,7 @@ class LibrarySortTest {
             listOf("Read last week", "Reading now", "Never opened, new", "Never opened, old"),
             titles(opened, LibrarySort.OPENED, reversed = true),
         )
-        assertEquals("Last opened, least recent first", LibraryOrder(LibrarySort.OPENED, reversed = true).label)
+        assertEquals("Last read, least recent first", LibraryOrder(LibrarySort.OPENED, reversed = true).label)
     }
 
     private val works = listOf(
