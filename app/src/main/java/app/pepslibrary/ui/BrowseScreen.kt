@@ -39,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import app.pepslibrary.BuildConfig
 import app.pepslibrary.ao3.Ao3
 import app.pepslibrary.data.DownloadQueueEntity
 import app.pepslibrary.data.DownloadQueueRepository
@@ -167,7 +168,7 @@ private fun createWebView(
         allowContentAccess = false
     }
     // Step 3 must send this exact user-agent from OkHttp, or bot-check cookies may not carry over.
-    Log.i(TAG, "WebView user agent: ${settings.userAgentString}")
+    if (BuildConfig.DEBUG) Log.i(TAG, "WebView user agent: ${settings.userAgentString}")
 
     CookieManager.getInstance().setAcceptCookie(true)
 
@@ -185,7 +186,9 @@ private fun createWebView(
 
         override fun onPageFinished(view: WebView, url: String) {
             CookieManager.getInstance().flush()
-            // Names only, never values: lets us confirm the session cookie survives an app restart.
+            // Debug builds only (release logs would record every page visited), and names only, never values:
+            // lets us confirm the session cookie survives an app restart.
+            if (!BuildConfig.DEBUG) return
             val names = CookieManager.getInstance().getCookie(url)
                 ?.split(";")?.map { it.substringBefore("=").trim() }
             Log.d(TAG, "Cookies for $url: $names")

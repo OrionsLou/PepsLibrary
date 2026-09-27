@@ -71,6 +71,8 @@ class WebViewCookieJarTest {
             "https://archiveofourown.org.evil.com/",
             "https://evilarchiveofourown.org/",
             "http://archiveofourown.org/",
+            "https://archiveofourown.org@evil.com/", // userinfo, not the host
+
         ).forEach {
             assertTrue("cookies leaked to $it", jar.loadForRequest(it.toHttpUrl()).isEmpty())
         }
