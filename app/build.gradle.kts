@@ -58,6 +58,8 @@ android {
     }
     buildFeatures {
         compose = true
+        // BuildConfig.DEBUG keeps browsing details (visited URLs, cookie names) out of release logs.
+        buildConfig = true
     }
     lint {
         // Readium pulls in androidx.lifecycle 2.9, whose bundled lint check was built for a newer Kotlin analysis
