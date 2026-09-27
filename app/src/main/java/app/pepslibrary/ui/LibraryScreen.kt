@@ -54,8 +54,8 @@ fun LibraryScreen(
     progress: Map<Long, Double?>,
     /** Works being downloaded right now; they can't be deleted until that finishes. */
     downloading: Set<Long>,
-    sort: LibrarySort,
-    onSortChange: (LibrarySort) -> Unit,
+    order: LibraryOrder,
+    onOrderChange: (LibraryOrder) -> Unit,
     onOpenWork: (workId: Long) -> Unit,
     onDeleteWork: (workId: Long) -> Unit,
     onBack: () -> Unit,
@@ -65,7 +65,7 @@ fun LibraryScreen(
     var confirmDelete by remember { mutableStateOf<WorkEntity?>(null) }
     val listState = rememberLazyListState()
     // A new order starts from the top. Otherwise the list keeps whichever card was first in view, now mid-list.
-    LaunchedEffect(sort) { listState.scrollToItem(0) }
+    LaunchedEffect(order) { listState.scrollToItem(0) }
 
     confirmDelete?.let { work ->
         AlertDialog(
@@ -100,7 +100,7 @@ fun LibraryScreen(
             }
 
             if (works.isNotEmpty()) {
-                SortMenu(sort, onSortChange, Modifier.padding(horizontal = 12.dp))
+                SortMenu(order, onOrderChange, Modifier.padding(horizontal = 12.dp))
             }
 
             if (works.isEmpty()) {
@@ -116,7 +116,7 @@ fun LibraryScreen(
                     contentPadding = PaddingValues(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(sortWorks(works, sort), key = { it.workId }) { work ->
+                    items(sortWorks(works, order), key = { it.workId }) { work ->
                         WorkCard(
                             work = work,
                             progressLabel = readingProgressLabel(progress[work.workId]),
@@ -132,19 +132,29 @@ fun LibraryScreen(
 }
 
 @Composable
-private fun SortMenu(sort: LibrarySort, onSortChange: (LibrarySort) -> Unit, modifier: Modifier = Modifier) {
+private fun SortMenu(order: LibraryOrder, onOrderChange: (LibraryOrder) -> Unit, modifier: Modifier = Modifier) {
     var expanded by remember { mutableStateOf(false) }
     Box(modifier) {
         TextButton(onClick = { expanded = true }) {
-            Text("Sort: ${sort.label}")
+            Text("Sort: ${order.label}")
             Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             LibrarySort.entries.forEach { option ->
+                val current = option == order.sort
                 DropdownMenuItem(
-                    text = { Text(option.label) },
-                    onClick = { onSortChange(option); expanded = false },
-                    trailingIcon = { if (option == sort) Icon(Icons.Filled.Check, contentDescription = "Selected") },
+                    // The selected option shows the direction tapping it again will switch to.
+                    text = {
+                        Column {
+                            Text(option.label)
+                            if (current) {
+                                val next = if (order.reversed) option.naturalDirection else option.reversedDirection
+                                Text("Tap to sort $next", style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    },
+                    onClick = { onOrderChange(order.select(option)); expanded = false },
+                    trailingIcon = { if (current) Icon(Icons.Filled.Check, contentDescription = "Selected") },
                 )
             }
         }
