@@ -1,6 +1,8 @@
 package app.pepslibrary.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,11 +22,14 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -56,6 +61,8 @@ fun LibraryScreen(
     downloading: Set<Long>,
     order: LibraryOrder,
     onOrderChange: (LibraryOrder) -> Unit,
+    filter: LibraryFilter,
+    onFilterChange: (LibraryFilter) -> Unit,
     onOpenWork: (workId: Long) -> Unit,
     onDeleteWork: (workId: Long) -> Unit,
     onBack: () -> Unit,
@@ -63,9 +70,15 @@ fun LibraryScreen(
 ) {
     BackHandler(onBack = onBack)
     var confirmDelete by remember { mutableStateOf<WorkEntity?>(null) }
+    var showFilters by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
-    // A new order starts from the top. Otherwise the list keeps whichever card was first in view, now mid-list.
-    LaunchedEffect(order) { listState.scrollToItem(0) }
+    // A new order or filter starts from the top. Otherwise the list keeps whichever card was first in view.
+    LaunchedEffect(order, filter) { listState.scrollToItem(0) }
+    val shown = sortWorks(works.filter(filter::matches), order)
+
+    if (showFilters) {
+        FilterSheet(works, filter, onFilterChange, onDismiss = { showFilters = false })
+    }
 
     confirmDelete?.let { work ->
         AlertDialog(
@@ -93,14 +106,19 @@ fun LibraryScreen(
                 }
                 Text("Library", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
                 Text(
-                    "${works.size} ${if (works.size == 1) "work" else "works"}",
+                    workCountLabel(shown = shown.size, total = works.size, filtered = filter.isActive),
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(end = 16.dp),
                 )
             }
 
             if (works.isNotEmpty()) {
-                SortMenu(order, onOrderChange, Modifier.padding(horizontal = 12.dp))
+                Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    SortMenu(order, onOrderChange, Modifier.weight(1f, fill = false))
+                    TextButton(onClick = { showFilters = true }) {
+                        Text(if (filter.isActive) "Filter (${filter.selectedCount})" else "Filter")
+                    }
+                }
             }
 
             if (works.isEmpty()) {
@@ -110,13 +128,22 @@ fun LibraryScreen(
                         style = MaterialTheme.typography.bodyLarge,
                     )
                 }
+            } else if (shown.isEmpty()) {
+                Column(
+                    Modifier.fillMaxSize().padding(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text("No works match these filters.", style = MaterialTheme.typography.bodyLarge)
+                    TextButton(onClick = { onFilterChange(LibraryFilter()) }) { Text("Clear filters") }
+                }
             } else {
                 LazyColumn(
                     state = listState,
                     contentPadding = PaddingValues(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(sortWorks(works, order), key = { it.workId }) { work ->
+                    items(shown, key = { it.workId }) { work ->
                         WorkCard(
                             work = work,
                             progressLabel = readingProgressLabel(progress[work.workId]),
@@ -128,6 +155,66 @@ fun LibraryScreen(
                 }
             }
         }
+    }
+}
+
+internal fun workCountLabel(shown: Int, total: Int, filtered: Boolean): String {
+    val noun = if (total == 1) "work" else "works"
+    return if (filtered) "$shown of $total $noun" else "$total $noun"
+}
+
+/** One section per kind of filter; the sheet itself scrolls, so a long author list stays usable. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FilterSheet(
+    works: List<WorkEntity>,
+    filter: LibraryFilter,
+    onFilterChange: (LibraryFilter) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Filters", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            TextButton(onClick = { onFilterChange(LibraryFilter()) }, enabled = filter.isActive) { Text("Clear all") }
+        }
+        LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
+            item { FilterSectionHeader("Author") }
+            items(authorOptions(works, filter), key = { "author:${it.value}" }) { option ->
+                FilterRow(option, checked = option.value in filter.authors) {
+                    onFilterChange(filter.toggleAuthor(option.value))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FilterSectionHeader(title: String) {
+    Text(
+        title,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 24.dp, top = 16.dp, bottom = 4.dp),
+    )
+}
+
+@Composable
+private fun FilterRow(option: FilterOption, checked: Boolean, onToggle: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .toggleable(value = checked, role = Role.Checkbox, onValueChange = { onToggle() })
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Checkbox(checked = checked, onCheckedChange = null, modifier = Modifier.padding(12.dp))
+        Text(option.label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Text(
+            "${option.count}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(end = 12.dp),
+        )
     }
 }
 
