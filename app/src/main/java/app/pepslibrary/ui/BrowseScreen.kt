@@ -51,6 +51,7 @@ import app.pepslibrary.BuildConfig
 import app.pepslibrary.ao3.Ao3
 import app.pepslibrary.data.DownloadQueueEntity
 import app.pepslibrary.data.DownloadQueueRepository
+import app.pepslibrary.data.QueueStatus
 import app.pepslibrary.download.DownloadProgress
 import app.pepslibrary.download.RunningDownload
 import app.pepslibrary.network.NetworkMonitor
@@ -211,11 +212,26 @@ private fun DownloadBar(
                     TextButton(onClick = onDownload) { Text("Update") }
                     Button(onClick = onRead) { Text("Read") }
                 }
-                else -> {
-                    Button(onClick = onDownload) { Text(queueButtonLabel(entry)) }
-                    queueStatusLabel(entry, online)?.let {
-                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                // Waiting its turn, for a connection, or to retry: nothing to start, but it can be taken off the queue.
+                entry?.status == QueueStatus.PENDING -> Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        queueStatusLabel(entry, online).orEmpty(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = onCancel) { Text("Cancel") }
+                }
+                else -> Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (entry == null) {
+                        Text("Not in your library", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                    } else {
+                        Text(
+                            queueStatusLabel(entry, online).orEmpty(),
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f),
+                        )
                     }
+                    Button(onClick = onDownload) { Text(queueButtonLabel(entry)) }
                 }
             }
         }

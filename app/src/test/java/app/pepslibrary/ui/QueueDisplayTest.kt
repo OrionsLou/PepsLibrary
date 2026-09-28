@@ -86,10 +86,10 @@ class QueueDisplayTest {
 
     @Test
     fun buttonLabelIsDownloadExceptWhenFailed() {
-        assertEquals("Download EPUB", queueButtonLabel(null))
-        assertEquals("Download EPUB", queueButtonLabel(entry(QueueStatus.PENDING)))
-        assertEquals("Download EPUB", queueButtonLabel(entry(QueueStatus.IN_PROGRESS)))
-        assertEquals("Retry download", queueButtonLabel(entry(QueueStatus.FAILED)))
+        assertEquals("Save", queueButtonLabel(null))
+        assertEquals("Save", queueButtonLabel(entry(QueueStatus.PENDING)))
+        assertEquals("Save", queueButtonLabel(entry(QueueStatus.IN_PROGRESS)))
+        assertEquals("Retry", queueButtonLabel(entry(QueueStatus.FAILED)))
     }
 
     // --- download progress ---

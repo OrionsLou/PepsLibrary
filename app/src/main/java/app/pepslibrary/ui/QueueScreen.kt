@@ -83,7 +83,7 @@ fun QueueScreen(
 
 
             if (entries.isEmpty()) {
-                SleepingCatMessage("Nothing downloading. Open a work in the browser and tap Download EPUB.")
+                SleepingCatMessage("Nothing downloading. Open a work in the browser and tap Save.")
             } else {
                 LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
                     items(entries, key = { it.workId }) { entry ->

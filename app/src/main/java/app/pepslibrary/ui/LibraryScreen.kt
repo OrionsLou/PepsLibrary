@@ -146,7 +146,7 @@ fun LibraryScreen(
             }
 
             if (works.isEmpty()) {
-                SleepingCatMessage("Nothing on the shelf yet. Open a work in the browser and tap Download EPUB.")
+                SleepingCatMessage("Nothing on the shelf yet. Open a work in the browser and tap Save.")
             } else if (shown.isEmpty()) {
                 Column(
                     Modifier.fillMaxSize().padding(24.dp),
