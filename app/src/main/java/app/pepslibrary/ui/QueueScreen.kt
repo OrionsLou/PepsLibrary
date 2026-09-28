@@ -15,7 +15,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -54,11 +54,16 @@ fun QueueScreen(
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to browser")
                 }
                 Text("Downloads", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-                Text(
-                    "${entries.size} ${if (entries.size == 1) "item" else "items"}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(end = 16.dp),
-                )
+            }
+            Shelf {
+                if (entries.isNotEmpty()) {
+                    Text(
+                        "${entries.size} ${if (entries.size == 1) "work" else "works"}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 12.dp),
+                    )
+                }
             }
 
             if (!online) {
@@ -71,25 +76,24 @@ fun QueueScreen(
                 }
             }
 
+
             if (entries.isEmpty()) {
-                Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-                    Text(
-                        "Nothing queued. Open a work in the browser and tap Download EPUB.",
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                }
+                SleepingCatMessage("Nothing downloading. Open a work in the browser and tap Download EPUB.")
             } else {
-                LazyColumn(
-                    contentPadding = PaddingValues(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
+                LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
                     items(entries, key = { it.workId }) { entry ->
-                        QueueCard(
-                            entry,
-                            online,
-                            onRetry = { onRetry(entry.workId) },
-                            onRemove = { onRemove(entry.workId) },
-                        )
+                        Column(Modifier.animateItem()) {
+                            QueueRow(
+                                entry,
+                                online,
+                                onRetry = { onRetry(entry.workId) },
+                                onRemove = { onRemove(entry.workId) },
+                            )
+                            HorizontalDivider(
+                                Modifier.padding(horizontal = 16.dp),
+                                color = MaterialTheme.colorScheme.outlineVariant,
+                            )
+                        }
                     }
                 }
             }
@@ -98,22 +102,25 @@ fun QueueScreen(
 }
 
 @Composable
-private fun QueueCard(entry: DownloadQueueEntity, online: Boolean, onRetry: () -> Unit, onRemove: () -> Unit) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            // No title yet: it's only known once the work page is actually fetched, which hasn't happened (or
-            // didn't succeed) for anything shown here. See HANDOFF's phase 3 UI-polish note if this feels too bare.
-            Text("Work ${entry.workId}", style = MaterialTheme.typography.titleMedium)
-            queueStatusLabel(entry, online)?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+private fun QueueRow(entry: DownloadQueueEntity, online: Boolean, onRetry: () -> Unit, onRemove: () -> Unit) {
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        // No title yet: it's only known once the work page is actually fetched, which hasn't happened (or
+        // didn't succeed) for anything shown here. See HANDOFF's phase 3 UI-polish note if this feels too bare.
+        Text("Work ${entry.workId}", style = MaterialTheme.typography.titleMedium)
+        queueStatusLabel(entry, online)?.let {
+            Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
 
-            // Remove and Cancel are the same action (stop it if running, then take it off the queue); the label
-            // just says which one it is for this row.
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (entry.status == QueueStatus.FAILED) {
-                    Button(onClick = onRetry) { Text("Retry now") }
-                }
-                OutlinedButton(onClick = onRemove) { Text(if (queueShowsCancel(entry)) "Cancel" else "Remove") }
+        // Remove and Cancel are the same action (stop it if running, then take it off the queue); the label
+        // just says which one it is for this row.
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (entry.status == QueueStatus.FAILED) {
+                Button(onClick = onRetry) { Text("Retry now") }
             }
+            OutlinedButton(onClick = onRemove) { Text(if (queueShowsCancel(entry)) "Cancel" else "Remove") }
         }
     }
 }

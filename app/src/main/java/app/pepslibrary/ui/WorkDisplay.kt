@@ -6,10 +6,11 @@ import kotlin.math.roundToInt
 
 /**
  * How far into a work the reader is, from the saved fraction (0.0 to 1.0, or null if never opened or unknown):
- * "Not started", "42% read" or "Finished".
+ * "Not started", "42% read" or "Finished". A work that was [opened] but not read past its first page says so, rather
+ * than "Not started" beside a "Last read" date.
  */
-internal fun readingProgressLabel(fraction: Double?): String = when {
-    fraction == null || fraction < 0.005 -> "Not started"
+internal fun readingProgressLabel(fraction: Double?, opened: Boolean = false): String = when {
+    fraction == null || fraction < 0.005 -> if (opened) "Opened, not started" else "Not started"
     fraction >= 0.995 -> "Finished"
     else -> "${(fraction * 100).roundToInt()}% read"
 }
@@ -49,20 +50,20 @@ internal fun lastReadLabel(lastOpenedAt: Long?, formatDate: (Long) -> String): S
 internal fun workByline(work: WorkEntity): String? =
     work.authors.takeIf { it.isNotEmpty() }?.joinToString(", ")?.let { "by $it" }
 
-/** e.g. "8,994 words · 3/3 chapters · Complete". Parts AO3 didn't give us are left out. */
+/** e.g. "8,994 words, 3 of 3 chapters, complete". Parts AO3 didn't give us are left out. */
 internal fun workStatsLine(work: WorkEntity): String {
     val words = work.words?.let { String.format(Locale.US, "%,d %s", it, if (it == 1) "word" else "words") }
 
     val published = work.chaptersPublished
     val total = work.chaptersTotal
     val chapters = published?.let {
-        if (it == 1 && total == 1) "1 chapter" else "$it/${total ?: "?"} chapters"
+        if (it == 1 && total == 1) "1 chapter" else "$it of ${total ?: "?"} chapters"
     }
     val status = when (completionStatus(work)) {
-        CompletionStatus.COMPLETED -> "Complete"
-        CompletionStatus.WIP -> "In progress"
+        CompletionStatus.COMPLETED -> "complete"
+        CompletionStatus.WIP -> "in progress"
         CompletionStatus.OTHER -> null
     }
 
-    return listOfNotNull(words, chapters, status).joinToString(" · ")
+    return listOfNotNull(words, chapters, status).joinToString(", ").replaceFirstChar { it.uppercase() }
 }

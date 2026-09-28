@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pep asleep, curled up: for empty screens. One colour, tinted from the theme where it's drawn. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="64dp"
+    android:height="40dp"
+    android:viewportWidth="64"
+    android:viewportHeight="40">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M15,28 A21,10.5 0 1,0 57,28 A21,10.5 0 1,0 15,28 Z" />
+    <path
+        android:fillColor="#FF000000"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="1.2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M9.5,22.5 L10.5,15.5 L15,19.2 Z M20.5,21 L21,14 L16.8,18.2 Z" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M7.5,26 A8,7 0 1,0 23.5,26 A8,7 0 1,0 7.5,26 Z" />
+    <path
+        android:strokeColor="#FF000000"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M55,31 C55,38 44,40.5 30,39.5 C24,39 19,37.5 17,35.5" />
+    <path
+        android:strokeColor="#FF000000"
+        android:strokeWidth="0.6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M7.6,27.4 L2.5,26.5 M7.6,29 L2.5,29.8" />
+</vector>

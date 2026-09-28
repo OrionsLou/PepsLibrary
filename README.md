@@ -39,13 +39,14 @@ in-app, download whole works as EPUBs, read them offline, and resume exactly whe
   live via Room). Scoped down from the original "already downloaded" badge plan: the data-layer check landed now,
   and the visible badge/button change on AO3's own pages is deferred to the Phase 3 UI polish pass rather than done
   as a one-off ahead of it.
-- The **Library** button in the footer opens a list of downloaded works (title, authors, fandoms, word and chapter
-  counts with a Complete/In progress status, summary and download date). It slides over the browser, so the page
+- The **Library** button in the footer opens Pep's Library: the downloaded works as shelf rows (title, authors,
+  fandoms, word and chapter counts with a complete/in progress status, summary, how far you've read with a thin
+  progress line, and download date), with Pep sitting on the shelf above them. It slides over the browser, so the page
   and history you were on are kept. Downloading a work again replaces its entry. The trash icon on a work deletes
-  it (after a confirmation), along with its file and reading position. The **Sort** menu orders the library by when
+  it (after a confirmation), along with its file and reading position, and the list closes the gap smoothly. The **Sort** menu orders the library by when
   you last opened each work (the default, so what you're reading is on top), date downloaded, title, or author;
   choosing the current option again reverses it. The header shows how much storage the listed works
-  use, and each card shows its size and when you last read the work; its pin
+  use, and each row shows its size and when you last read the work; its pin
   button keeps it at the top of the list whatever the sort. **Filter** narrows the library to pinned works, by completion status
   (completed, work in progress, or chapter count unknown), by fandom, and by author; they combine. The chosen
   sort and filters are remembered across app restarts.

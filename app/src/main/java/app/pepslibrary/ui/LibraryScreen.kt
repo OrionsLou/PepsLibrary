@@ -1,13 +1,15 @@
 package app.pepslibrary.ui
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.selection.toggleable
-import androidx.compose.ui.semantics.Role
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -15,6 +17,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -22,16 +26,14 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.material3.LocalContentColor
-import androidx.compose.ui.draw.rotate
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
@@ -45,9 +47,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.pepslibrary.R
 import app.pepslibrary.data.WorkEntity
 import java.text.DateFormat
 import java.util.Date
@@ -111,22 +118,26 @@ fun LibraryScreen(
                 IconButton(onClick = onBack) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to browser")
                 }
-                Text("Library", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                IconButton(onClick = onOpenSettings) {
+                    Icon(Icons.Filled.Settings, contentDescription = "Settings")
+                }
+            }
+            if (works.isNotEmpty()) {
                 Text(
                     listOfNotNull(
                         workCountLabel(shown = shown.size, total = works.size, filtered = filter.isActive),
                         // The size of what's listed, so it always matches the list, filtered or not.
                         shown.takeIf { it.isNotEmpty() }?.let { list -> formatFileSize(list.sumOf { it.fileSizeBytes }) },
-                    ).joinToString(" · "),
+                    ).joinToString(", "),
                     style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 16.dp),
                 )
-                IconButton(onClick = onOpenSettings) {
-                    Icon(Icons.Filled.Settings, contentDescription = "Settings")
-                }
             }
-
-            if (works.isNotEmpty()) {
-                Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            // Sort and Filter sit on the shelf, beside Pep.
+            Shelf {
+                if (works.isNotEmpty()) {
                     SortMenu(order, onOrderChange, Modifier.weight(1f, fill = false))
                     TextButton(onClick = { showFilters = true }) {
                         Text(if (filter.isActive) "Filter (${filter.selectedCount})" else "Filter")
@@ -135,12 +146,7 @@ fun LibraryScreen(
             }
 
             if (works.isEmpty()) {
-                Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-                    Text(
-                        "No downloads yet. Open a work in the browser and tap Download EPUB.",
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                }
+                SleepingCatMessage("Nothing on the shelf yet. Open a work in the browser and tap Download EPUB.")
             } else if (shown.isEmpty()) {
                 Column(
                     Modifier.fillMaxSize().padding(24.dp),
@@ -151,20 +157,24 @@ fun LibraryScreen(
                     TextButton(onClick = { onFilterChange(LibraryFilter()) }) { Text("Clear filters") }
                 }
             } else {
-                LazyColumn(
-                    state = listState,
-                    contentPadding = PaddingValues(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
+                LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 16.dp)) {
                     items(shown, key = { it.workId }) { work ->
-                        WorkCard(
-                            work = work,
-                            progressLabel = readingProgressLabel(progress[work.workId]),
-                            canDelete = work.workId !in downloading,
-                            onClick = { onOpenWork(work.workId) },
-                            onTogglePin = { onSetPinned(work.workId, !work.pinned) },
-                            onDelete = { confirmDelete = work },
-                        )
+                        // A deleted work fades out and the rest slide up to close the gap, rather than the list
+                        // jumping; a re-sort slides works to their new places.
+                        Column(Modifier.animateItem()) {
+                            WorkRow(
+                                work = work,
+                                fraction = progress[work.workId],
+                                canDelete = work.workId !in downloading,
+                                onClick = { onOpenWork(work.workId) },
+                                onTogglePin = { onSetPinned(work.workId, !work.pinned) },
+                                onDelete = { confirmDelete = work },
+                            )
+                            HorizontalDivider(
+                                Modifier.padding(horizontal = 16.dp),
+                                color = MaterialTheme.colorScheme.outlineVariant,
+                            )
+                        }
                     }
                 }
             }
@@ -279,69 +289,106 @@ private fun SortMenu(order: LibraryOrder, onOrderChange: (LibraryOrder) -> Unit,
     }
 }
 
+/**
+ * One work on the shelf: a flat row rather than a card, title in Literata, the details in quieter text, and how far
+ * in you are as a thin accent line along the bottom.
+ */
 @Composable
-private fun WorkCard(
+private fun WorkRow(
     work: WorkEntity,
-    progressLabel: String,
+    fraction: Double?,
     canDelete: Boolean,
     onClick: () -> Unit,
     onTogglePin: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(start = 16.dp, end = 4.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(verticalAlignment = Alignment.Top) {
-                Text(
-                    work.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f).padding(top = 16.dp),
+    Column(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(start = 16.dp, top = 4.dp, bottom = 14.dp)) {
+        Row(verticalAlignment = Alignment.Top) {
+            Text(
+                work.title,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f).padding(top = 12.dp),
+            )
+            IconButton(onClick = onTogglePin) {
+                // A pinned work's pin tilts, like one pushed into a board.
+                val tilt by animateFloatAsState(if (work.pinned) 45f else 0f, label = "pinTilt")
+                Icon(
+                    if (work.pinned) PinIcons.Filled else PinIcons.Outlined,
+                    contentDescription = if (work.pinned) "Unpin ${work.title}" else "Pin ${work.title} to the top",
+                    tint = if (work.pinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.rotate(tilt),
                 )
-                IconButton(onClick = onTogglePin) {
-                    // A pinned work's pin tilts, like one pushed into a board.
-                    val tilt by animateFloatAsState(if (work.pinned) 45f else 0f, label = "pinTilt")
-                    Icon(
-                        if (work.pinned) PinIcons.Filled else PinIcons.Outlined,
-                        contentDescription = if (work.pinned) "Unpin ${work.title}" else "Pin ${work.title} to the top",
-                        tint = if (work.pinned) MaterialTheme.colorScheme.primary else LocalContentColor.current,
-                        modifier = Modifier.rotate(tilt),
-                    )
-                }
-                IconButton(onClick = onDelete, enabled = canDelete) {
-                    Icon(
-                        Icons.Outlined.Delete,
-                        contentDescription = if (canDelete) "Delete ${work.title}" else "Downloading, can't delete yet",
-                    )
-                }
             }
-            Column(Modifier.padding(end = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                WorkDetails(work, progressLabel)
+            IconButton(onClick = onDelete, enabled = canDelete) {
+                Icon(
+                    Icons.Outlined.Delete,
+                    contentDescription = if (canDelete) "Delete ${work.title}" else "Downloading, can't delete yet",
+                    tint = if (canDelete) MaterialTheme.colorScheme.onSurfaceVariant else LocalContentColor.current.copy(alpha = 0.38f),
+                )
             }
+        }
+        Column(Modifier.padding(end = 16.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            WorkDetails(work, fraction)
         }
     }
 }
 
 @Composable
-private fun WorkDetails(work: WorkEntity, progressLabel: String) {
+private fun WorkDetails(work: WorkEntity, fraction: Double?) {
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
     workByline(work)?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
     if (work.fandoms.isNotEmpty()) {
         Text(
             work.fandoms.joinToString(", "),
             style = MaterialTheme.typography.bodySmall,
+            color = muted,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
     }
     workStatsLine(work).takeIf { it.isNotEmpty() }?.let {
-        Text(it, style = MaterialTheme.typography.bodySmall)
+        Text(it, style = MaterialTheme.typography.bodySmall, color = muted)
     }
-    Text(progressLabel, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
     work.summary?.let {
-        Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 3, overflow = TextOverflow.Ellipsis)
+        Text(
+            it,
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 4.dp),
+        )
     }
     val formatDate = { millis: Long -> DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(millis)) }
-    lastReadLabel(work.lastOpenedAt, formatDate)?.let { Text(it, style = MaterialTheme.typography.labelSmall) }
     Text(
-        "Downloaded ${formatDate(work.downloadedAt)} · ${formatFileSize(work.fileSizeBytes)}",
-        style = MaterialTheme.typography.labelSmall,
+        listOfNotNull(
+            readingProgressLabel(fraction, opened = work.lastOpenedAt != null),
+            lastReadLabel(work.lastOpenedAt, formatDate)?.replaceFirstChar { it.lowercase() },
+        ).joinToString(", "),
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(top = 6.dp),
     )
+    ReadingProgressLine(fraction)
+    Text(
+        "Downloaded ${formatDate(work.downloadedAt)}, ${formatFileSize(work.fileSizeBytes)}",
+        style = MaterialTheme.typography.labelSmall,
+        color = muted,
+    )
+}
+
+/** How far in, as a thin accent line on a hairline track; nothing at all for a work not yet started. */
+@Composable
+private fun ReadingProgressLine(fraction: Double?) {
+    val shown = (fraction ?: 0.0).toFloat().coerceIn(0f, 1f)
+    if (shown < 0.005f) return
+    Box(
+        Modifier
+            .padding(vertical = 2.dp)
+            .fillMaxWidth()
+            .height(3.dp)
+            .clip(RoundedCornerShape(1.5.dp))
+            .background(MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Box(Modifier.fillMaxWidth(shown).fillMaxHeight().background(MaterialTheme.colorScheme.primary))
+    }
 }
