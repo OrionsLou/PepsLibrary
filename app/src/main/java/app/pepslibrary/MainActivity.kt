@@ -8,17 +8,17 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import app.pepslibrary.ui.PepsLibraryApp
+import app.pepslibrary.ui.theme.PepsTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            MaterialTheme {
+            PepsTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     Box(Modifier.safeDrawingPadding()) {
                         PepsLibraryApp()

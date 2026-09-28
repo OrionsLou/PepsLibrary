@@ -1,0 +1,4 @@
+<resources>
+    <!-- The window's colour before Compose draws; keep in step with PepsPalette in ui/theme/PepsTheme.kt. -->
+    <color name="coat">#F2F2F0</color>
+</resources>
