@@ -39,13 +39,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.input.pointer.pointerInput
@@ -82,11 +82,22 @@ fun LibraryScreen(
 ) {
     var confirmDelete by remember { mutableStateOf<WorkEntity?>(null) }
     var showFilters by remember { mutableStateOf(false) }
+    // The work whose pin was last tapped: it's drawn above the others while it slides to its new place, rather than
+    // passing unseen underneath them.
+    var lastPinToggled by remember { mutableStateOf<Long?>(null) }
     val listState = rememberLazyListState()
     val shown = sortWorks(works.filter(filter::matches), order)
     // Start from the top when the order, the filter, or the work at the top changes (e.g. the one just read moving
-    // up under "Last read"). Otherwise the list keeps whichever card was first in view and hides the new top one.
-    LaunchedEffect(order, filter, shown.firstOrNull()?.workId) { listState.scrollToItem(0) }
+    // up under "Last read", or a work just pinned). Otherwise the list keeps whichever work was first in view and
+    // hides the new top one. requestScrollToItem, called here during composition, is applied in the same layout pass
+    // as the new order, so works still slide to their new places. scrollToItem from an effect ran a frame later as a
+    // jump, which cancelled those animations and made pinning snap.
+    val top = Triple(order, filter, shown.firstOrNull()?.workId)
+    val lastTop = remember { arrayOf(top) }
+    if (top != lastTop[0]) {
+        lastTop[0] = top
+        listState.requestScrollToItem(0)
+    }
 
     if (showFilters) {
         FilterSheet(works, filter, onFilterChange, onDismiss = { showFilters = false })
@@ -158,14 +169,23 @@ fun LibraryScreen(
                 LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 16.dp)) {
                     items(shown, key = { it.workId }) { work ->
                         // A deleted work fades out and the rest slide up to close the gap, rather than the list
-                        // jumping; a re-sort slides works to their new places.
-                        Column(Modifier.animateItem()) {
+                        // jumping; a re-sort or a pin slides works to their new places. The background keeps a row
+                        // sliding past another from showing both rows' text at once.
+                        Column(
+                            Modifier
+                                .zIndex(if (work.workId == lastPinToggled) 1f else 0f)
+                                .animateItem()
+                                .background(MaterialTheme.colorScheme.surface),
+                        ) {
                             WorkRow(
                                 work = work,
                                 fraction = progress[work.workId],
                                 canDelete = work.workId !in downloading,
                                 onClick = { onOpenWork(work.workId) },
-                                onTogglePin = { onSetPinned(work.workId, !work.pinned) },
+                                onTogglePin = {
+                                    lastPinToggled = work.workId
+                                    onSetPinned(work.workId, !work.pinned)
+                                },
                                 onDelete = { confirmDelete = work },
                             )
                             HorizontalDivider(
