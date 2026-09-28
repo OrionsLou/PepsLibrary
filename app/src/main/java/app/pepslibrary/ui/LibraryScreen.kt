@@ -1,6 +1,5 @@
 package app.pepslibrary.ui
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -81,7 +80,6 @@ fun LibraryScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    BackHandler(onBack = onBack)
     var confirmDelete by remember { mutableStateOf<WorkEntity?>(null) }
     var showFilters by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
