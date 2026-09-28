@@ -1,0 +1,7 @@
+<resources>
+    <style name="Theme.PepsLibrary" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/coat</item>
+        <item name="android:windowSplashScreenBackground">@color/coat</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+    </style>
+</resources>
