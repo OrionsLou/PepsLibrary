@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -69,6 +70,7 @@ fun LibraryScreen(
     onOpenWork: (workId: Long) -> Unit,
     onSetPinned: (workId: Long, pinned: Boolean) -> Unit,
     onDeleteWork: (workId: Long) -> Unit,
+    onOpenSettings: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -117,8 +119,10 @@ fun LibraryScreen(
                         shown.takeIf { it.isNotEmpty() }?.let { list -> formatFileSize(list.sumOf { it.fileSizeBytes }) },
                     ).joinToString(" · "),
                     style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(end = 16.dp),
                 )
+                IconButton(onClick = onOpenSettings) {
+                    Icon(Icons.Filled.Settings, contentDescription = "Settings")
+                }
             }
 
             if (works.isNotEmpty()) {

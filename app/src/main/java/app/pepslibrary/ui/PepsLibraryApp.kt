@@ -23,6 +23,7 @@ import app.pepslibrary.download.DownloadQueueProcessor
 import app.pepslibrary.download.EpubDownloader
 import app.pepslibrary.network.Ao3Http
 import app.pepslibrary.network.NetworkMonitor
+import app.pepslibrary.settings.AppSettings
 import app.pepslibrary.reader.ReaderActivity
 import kotlinx.coroutines.launch
 import java.io.File
@@ -39,6 +40,7 @@ fun PepsLibraryApp() {
     val scope = rememberCoroutineScope()
     var showLibrary by rememberSaveable { mutableStateOf(false) }
     var showQueue by rememberSaveable { mutableStateOf(false) }
+    var showSettings by rememberSaveable { mutableStateOf(false) }
     // Kept here rather than in the library screen, so closing and reopening the library keeps the chosen order.
     // Starts from the last saved choice, so it also survives an app restart; rememberSaveable still covers the
     // activity being recreated in between.
@@ -115,7 +117,29 @@ fun PepsLibraryApp() {
                         repository.delete(workId)
                     }
                 },
+                onOpenSettings = { showSettings = true },
                 onBack = { showLibrary = false },
+            )
+        }
+
+        if (showSettings) {
+            val settings = remember { AppSettings.get(context) }
+            val themeMode by settings.themeMode.collectAsState()
+            val readingTheme by settings.readingTheme.collectAsState()
+            SettingsScreen(
+                themeMode = themeMode,
+                onThemeMode = settings::setThemeMode,
+                readingTheme = readingTheme,
+                onReadingTheme = settings::setReadingTheme,
+                libraryOrder = LibraryOrder(librarySort, librarySortReversed),
+                libraryFilter = libraryFilter,
+                onResetLibraryView = {
+                    val default = LibraryOrder()
+                    librarySort = default.sort
+                    librarySortReversed = default.reversed
+                    libraryFilter = LibraryFilter()
+                },
+                onBack = { showSettings = false },
             )
         }
     }

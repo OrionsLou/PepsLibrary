@@ -10,9 +10,8 @@ in-app, download whole works as EPUBs, read them offline, and resume exactly whe
 ## What works today
 
 - Signed release build that installs on a device by sideloading.
-- Light and dark themes in a grey-tabby palette, following the phone's setting (an in-app override is stored,
-  with its control coming in a later step), so the status bar's icons are always visible. Titles use the Literata
-  typeface.
+- Light and dark themes in a grey-tabby palette, following the phone's setting (with an override in Settings), so the
+  status bar's icons are always visible. Titles use the Literata typeface.
 - A grey tabby app icon (Pep on a stack of books, with a themed-icon version for Android 13+), and a short opening
   animation on a cold start that shows the cat and the name "Pep's Library". A tap skips it.
 - AO3 loads in a `WebView` with the site's full search, filters and bookmarks. Signing in works and the session
@@ -61,6 +60,8 @@ in-app, download whole works as EPUBs, read them offline, and resume exactly whe
   percent preview, and a **Chapters** list that jumps to any chapter. Tap the middle of the page to show or hide it.
 - Three reading themes, Light, Sepia and Dark, switched by a button in that bar (each tap moves to the next). The
   reader's bars follow the page, and the choice is remembered.
+- A **Settings** screen (the gear in the library header) to choose the app's and the reader's themes, review or
+  reset the library's saved sort and filters, and see the app version. And a Meow button.
 - Re-downloading a work in progress keeps your place. New chapters appended, or edits to other chapters, leave the
   saved position exactly where it was, and if an earlier chapter was added or removed the position follows your
   chapter to its new place in the book. If the chapter you were reading was itself edited, the reader opens at the

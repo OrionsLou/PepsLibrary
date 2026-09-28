@@ -52,8 +52,9 @@ class AppSettings private constructor(context: Context) {
     /** Null until a reading theme has been chosen; see [ReadingTheme.resolve]. */
     val readingTheme: StateFlow<ReadingTheme?> = readingThemeState.asStateFlow()
 
-    fun setReadingTheme(theme: ReadingTheme) {
-        prefs.edit().putString(READING_THEME, theme.name).apply()
+    /** Null goes back to matching the app, as before anything was chosen. */
+    fun setReadingTheme(theme: ReadingTheme?) {
+        prefs.edit().putString(READING_THEME, theme?.name).apply()
         readingThemeState.value = theme
     }
 
