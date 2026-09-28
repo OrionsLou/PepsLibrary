@@ -3,77 +3,52 @@
 A personal Android app that wraps [Archive of Our Own](https://archiveofourown.org) so I can browse and sign in
 in-app, download whole works as EPUBs, read them offline, and resume exactly where I left off.
 
-> **Status:** version 1.0.0. The planned app is complete: browse and sign in to AO3, download works as EPUBs, read
-> them offline and pick up exactly where you left off, with a managed library and a finished look. Next up is
-> reading stats (Phase 4). See [HANDOFF.md](HANDOFF.md) for the goals, constraints and build plan.
+> **Status:** version 1.0.2 (tag `v1.0.2`). The planned app is complete: browse and sign in to AO3, download works
+> as EPUBs, read them offline and pick up exactly where you left off, with a managed library and a finished look.
+> Next up is reading stats (Phase 4). See [HANDOFF.md](HANDOFF.md) for the goals, constraints and build plan.
 
 ## What works today
 
-- Signed release build that installs on a device by sideloading.
-- Light and dark themes in a grey-tabby palette, following the phone's setting (with an override in Settings), so the
-  status bar's icons are always visible. Titles use the Literata typeface.
-- A grey tabby app icon (Pep on a stack of books, with a themed-icon version for Android 13+), and a short opening
-  animation on a cold start that shows the cat and the name "Pep's Library". A tap skips it.
-- AO3 loads in a `WebView` with the site's full search, filters and bookmarks. Signing in works and the session
-  cookies persist.
-- Navigation stays on AO3: links to other sites open in the system browser.
-- A retry screen is shown when a page fails to load. When the device is offline it says so instead, links to the
-  library, and reloads the page by itself once the connection is back.
-- A sticky footer under the browser has back, forward and refresh buttons, then the download queue and the library.
-  Back and forward follow the browsing history and are disabled at either end; refresh is the way out of an
-  intermittent Cloudflare error or bot-check page, and stays available on the error screen.
-- On a work page, a bar above the footer says whether the work is in your library. **Save** adds it to a download
-  queue rather than downloading it inline. The queue processes one work at a time, with a pause between downloads,
-  and automatically retries a bot check, rate limit, server error or network failure (up to 3 attempts, honoring
-  AO3's own `Retry-After` on a 429, backing off on its own otherwise) before giving up. The bar reflects the work's
-  queue status live: queued, downloading, retrying with the attempt count, or failed, with Cancel or Retry. The queue
-  survives the app closing and resumes on reopen, but doesn't keep running once the app is fully closed. While a
-  download runs, the bar shows what it's doing (loading the work page, waiting for AO3 to prepare the file, then how
-  much has arrived, with a progress bar). For a work already in the library it says "In your library" and offers
-  **Read** and **Update**. AO3's own pages are never modified.
-- While a page loads, a thick bar above it fills as it loads, with a moving layer so a stalled load still shows it's
-  working, and refresh becomes stop.
-- The **Download queue** button in the footer (an arrow into a tray, with a badge counting what's queued; the arrow
-  moves while a download runs) opens everything currently queued or failed, for a view across all works rather than
-  just the one you're on, each listed by its title. A failed item can be retried or removed from there, and a
-  download in progress can be cancelled from there or from the work's own page; cancelling never touches an existing
-  copy. While offline the queue pauses (without using up its retries) and resumes by itself once reconnected.
-- Each download is recorded in a local Room database, using metadata read from the work page that was already
-  fetched (no extra request): title, authors, summary, rating, warnings, categories, fandoms, relationships,
-  characters, tags, language, word and chapter counts, dates, and AO3's `updated_at` for later update checks.
-- The **Library** button in the footer (an open book) opens Pep's Library: the downloaded works as shelf rows (title,
-  authors, fandoms, word and chapter counts with a complete/in progress status, summary, how far you've read with a
-  thin progress line, when you last read it, and download date and size), with Pep sitting on the shelf above them.
-  Downloading a work again replaces its entry. The trash icon on a work deletes it (after a confirmation), along with
-  its file and reading position, and the list closes the gap smoothly. The **Sort** menu orders the library by when
-  you last read each work (the default, so what you're reading is on top), date downloaded, title, or author;
-  choosing the current option again reverses it. The header shows how many works are listed and how much storage
-  they use. A work's pin button keeps it at the top of the list whatever the sort. **Filter** narrows the library to
-  pinned works, by completion status (completed, work in progress, or chapter count unknown), by fandom, and by
-  author; they combine. The chosen sort and filters are remembered across app restarts.
-- The download queue, the library and Settings slide in over the browser and back out again, so the page and
-  history you were on are kept underneath.
-- Tapping a work in the library opens it in a **reader** built on the [Readium](https://readium.org) toolkit
-  (version 3.1.2): swipe or tap the page edges to turn pages, with the title and percent read in a top bar. The
-  reading position is saved (as a Readium locator, in Room) when you leave, when the app is stopped, and a second
-  after you stop turning pages, so even a killed app resumes at the same spot. Each library entry shows "Not
-  started", "Opened, not started", "42% read" or "Finished". Links inside a book never open inside the reader: an
-  AO3 link closes the reader and opens in the app's own browser (Back returns to the book), and any other link opens
-  in the phone's browser. A missing or damaged file gets a clear message instead of a crash, with buttons to
-  download the work again or go back to the library.
-- The reader has a bottom bar for moving around a work: a slider that steps page by page with a chapter and
-  percent preview, and a **Chapters** list that jumps to any chapter. Tap the middle of the page to show or hide it.
-- Three reading themes, Light, Sepia and Dark, switched by a button in that bar (each tap moves to the next). The
-  reader's bars follow the page, and the choice is remembered.
-- A **Settings** screen (the gear in the library header) to choose the app's and the reader's themes, review or
-  reset the library's saved sort and filters, and see the app version. And a Meow button.
-- Re-downloading a work in progress keeps your place. New chapters appended, or edits to other chapters, leave the
-  saved position exactly where it was, and if an earlier chapter was added or removed the position follows your
-  chapter to its new place in the book. If the chapter you were reading was itself edited, the reader opens at the
-  start of that chapter instead (or at the start of the work if the chapter is gone) and says so in a banner you
-  can close.
-- Tested on a physical Android device. On an emulator, AO3's Cloudflare bot check may block the page, so a real
-  device on a normal connection is recommended for testing.
+**Browsing AO3**
+- AO3 in an in-app browser, with the site's own search, filters and bookmarks. Sign-in persists.
+- Only AO3 opens in the app; other sites open in the phone's browser. AO3's pages are never modified.
+- A footer with back, forward and refresh (stop while loading), the download queue and the library.
+- Clear loading, error and offline states; an offline page reloads by itself once the connection is back.
+
+**Downloading**
+- On a work page, **Save** queues the whole work as one EPUB (one download per work, however many chapters).
+- Downloads run one at a time with a pause between them, retry automatically (honoring AO3's `Retry-After`), wait
+  out an offline spell, and show their progress. Any of them can be cancelled.
+- For a work you already have, the bar offers **Read**, and **Update** to fetch new chapters.
+- The **Download queue** screen lists everything queued or failed, by title, with Retry and Remove.
+
+**Library**
+- Pep's Library lists your works with their details, reading progress and size.
+- Sort by last read, date downloaded, title or author (either direction), filter by status, fandom, author or
+  pinned, and pin favorites to the top. The choices are remembered.
+- Delete a work, with its file and reading position.
+
+**Reading**
+- An offline EPUB reader ([Readium](https://readium.org) 3.1.2) that resumes exactly where you left off.
+- A bottom bar with a page slider and a chapter list, and Light, Sepia and Dark reading themes.
+- Updating a work in progress keeps your place, even if earlier chapters were added or removed.
+- AO3 links in a book open in the app's browser, and Back returns to the book.
+
+**Look and feel**
+- A grey-tabby theme in light and dark (following the phone, or set in **Settings**), with Pep as the app icon.
+- Short, quiet motion: screens slide in, and deleted or pinned works move smoothly.
+- And a **Meow** button in Settings.
+
+Built and tested on a physical Android phone, installed by sideloading. On an emulator, AO3's Cloudflare check can
+block pages, so a real device on a normal connection is best for testing.
+
+## Fixes since 1.0.0
+
+- **1.0.1:** pinning or unpinning a work in the library slides it smoothly to its new place, instead of the list
+  snapping into the new order. 1.0.1 has no tag of its own; the fix is in `v1.0.2`.
+- **1.0.2:** AO3 links inside a book (the preface's links to the work, its tags, series and author) open in the
+  app's own browser, where you're signed in, instead of the phone's browser. Back on that page returns to the book
+  at the same spot. Other links still open in the phone's browser.
 
 ## Roadmap
 
