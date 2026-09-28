@@ -30,7 +30,8 @@ in-app, download whole works as EPUBs, read them offline, and resume exactly whe
   the app closing and resumes on reopen, but doesn't keep running once the app is fully closed.
   While a download runs, the bar shows what it's doing (loading the work page, waiting for AO3 to prepare the file,
   then how much has arrived, with a progress bar). For a work already in the library it says "In your library"
-  and offers **Read** and **Update**. While a page loads, a bar runs along the top and refresh becomes stop.
+  and offers **Read** and **Update**. While a page loads, a thick bar along the top fills as it loads, with a moving layer so a stalled load still
+  shows it's working, and refresh becomes stop.
 - The **Download queue** button in the footer (an arrow into a tray, with a badge counting what's queued; the
   arrow moves while a download runs) opens everything currently queued or failed, for a view across all
   works rather than just the one you're on, each listed by its title. A failed item can be retried or removed from there, and a
