@@ -19,7 +19,7 @@ val keystoreProps = Properties().apply {
 // The one place to change the version: bump appVersion and versionCode follows (major * 10000 + minor * 100 +
 // patch, so 0.2.0 is 200). Android refuses to install a lower versionCode over a higher one, so this also guards
 // against putting an older build on the phone by mistake. Bump it for each feature or step that reaches the phone.
-val appVersion = "0.2.11"
+val appVersion = "1.0.0"
 fun versionCodeOf(name: String): Int {
     val parts = name.split(".").map { it.toIntOrNull() }
     require(parts.size == 3 && parts.all { it != null && it >= 0 } && parts[1]!! < 100 && parts[2]!! < 100) {
