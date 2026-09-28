@@ -1,3 +1,4 @@
 <resources>
-    <color name="ic_launcher_background">#990000</color>
+    <!-- Coat, the light background from PepsPalette: the icon looks the same whatever the phone's theme. -->
+    <color name="ic_launcher_background">#F2F2F0</color>
 </resources>

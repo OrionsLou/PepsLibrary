@@ -13,6 +13,8 @@ in-app, download whole works as EPUBs, read them offline, and resume exactly whe
 - Light and dark themes in a grey-tabby palette, following the phone's setting (an in-app override is stored,
   with its control coming in a later step), so the status bar's icons are always visible. Titles use the Literata
   typeface.
+- A grey tabby app icon (Pep on a stack of books, with a themed-icon version for Android 13+), and a short opening
+  animation on a cold start that shows the cat and the name "Pep's Library". A tap skips it.
 - AO3 loads in a `WebView` with the site's full search, filters and bookmarks. Signing in works and the session
   cookies persist.
 - Navigation stays on AO3: links to other sites open in the system browser.

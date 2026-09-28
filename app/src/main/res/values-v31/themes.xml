@@ -1,0 +1,12 @@
+<resources>
+    <!--
+        Android 12+ shows a system splash on a cold start: the app icon on the coat colour. The opening animation
+        (ui/OpeningScreen.kt) then takes over from the same icon in the same place. Keep in step with
+        values/themes.xml.
+    -->
+    <style name="Theme.PepsLibrary" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/coat</item>
+        <item name="android:windowSplashScreenBackground">@color/coat</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+    </style>
+</resources>
