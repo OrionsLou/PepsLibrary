@@ -3,6 +3,7 @@ package app.pepslibrary.ui
 import app.pepslibrary.data.DownloadQueueEntity
 import app.pepslibrary.data.MAX_ATTEMPTS
 import app.pepslibrary.data.QueueStatus
+import app.pepslibrary.download.DownloadProgress
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -89,5 +90,31 @@ class QueueDisplayTest {
         assertEquals("Download EPUB", queueButtonLabel(entry(QueueStatus.PENDING)))
         assertEquals("Download EPUB", queueButtonLabel(entry(QueueStatus.IN_PROGRESS)))
         assertEquals("Retry download", queueButtonLabel(entry(QueueStatus.FAILED)))
+    }
+
+    // --- download progress ---
+
+    @Test
+    fun progressIsDescribedStageByStage() {
+        assertEquals("Loading the work page...", downloadProgressLabel(DownloadProgress.LoadingPage))
+        assertEquals("Waiting for AO3 to prepare the file...", downloadProgressLabel(DownloadProgress.WaitingForAo3))
+        assertEquals("Downloading, 123 KB of 426 KB", downloadProgressLabel(DownloadProgress.Receiving(123_000, 426_000)))
+        assertEquals("Downloading, 123 KB", downloadProgressLabel(DownloadProgress.Receiving(123_000, null)))
+    }
+
+    @Test
+    fun aRunningEntrySaysWhatItsDoing_fallingBackToDownloading() {
+        val running = entry(QueueStatus.IN_PROGRESS)
+        assertEquals("Waiting for AO3 to prepare the file...", queueStatusLabel(running, progress = DownloadProgress.WaitingForAo3))
+        assertEquals("Downloading...", queueStatusLabel(running))
+    }
+
+    @Test
+    fun theBarFillsOnlyWhenTheSizeIsKnown() {
+        assertEquals(0.5f, downloadProgressFraction(DownloadProgress.Receiving(50, 100)))
+        assertEquals(1f, downloadProgressFraction(DownloadProgress.Receiving(150, 100)))
+        assertNull(downloadProgressFraction(DownloadProgress.Receiving(50, null)))
+        assertNull(downloadProgressFraction(DownloadProgress.WaitingForAo3))
+        assertNull(downloadProgressFraction(null))
     }
 }

@@ -14,18 +14,23 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -44,9 +49,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import app.pepslibrary.BuildConfig
 import app.pepslibrary.ao3.Ao3
-import app.pepslibrary.network.NetworkMonitor
 import app.pepslibrary.data.DownloadQueueEntity
 import app.pepslibrary.data.DownloadQueueRepository
+import app.pepslibrary.download.DownloadProgress
+import app.pepslibrary.download.RunningDownload
+import app.pepslibrary.network.NetworkMonitor
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
@@ -57,6 +66,10 @@ private const val TAG = "PepsLibrary"
 fun BrowseScreen(
     queue: DownloadQueueRepository,
     onCancelDownload: (workId: Long) -> Unit,
+    /** The download in progress, if any, for the Download bar's progress. */
+    running: StateFlow<RunningDownload?>,
+    isDownloaded: (workId: Long) -> Flow<Boolean>,
+    onReadWork: (workId: Long) -> Unit,
     onOpenQueue: () -> Unit,
     onOpenLibrary: () -> Unit,
     modifier: Modifier = Modifier,
@@ -89,6 +102,11 @@ fun BrowseScreen(
         error = null
         refreshTarget(webView.url)?.let { webView.loadUrl(it) } ?: webView.reload()
     }
+    val loading = progress in 1..99
+    fun stop() {
+        webView.stopLoading()
+        progress = 100 // a stopped load doesn't always report reaching the end
+    }
 
     BackHandler(enabled = canGoBack) { goBack() }
 
@@ -101,12 +119,7 @@ fun BrowseScreen(
         Box(Modifier.fillMaxWidth().weight(1f)) {
             AndroidView(factory = { webView }, modifier = Modifier.fillMaxSize())
 
-            if (progress in 1..99) {
-                LinearProgressIndicator(
-                    progress = { progress / 100f },
-                    modifier = Modifier.fillMaxWidth().align(Alignment.TopStart),
-                )
-            }
+            if (loading) PageLoadBar(progress, Modifier.align(Alignment.TopStart))
 
             error?.let { message ->
                 if (online) {
@@ -125,11 +138,17 @@ fun BrowseScreen(
                 queue.entries.map { entries -> entries.find { it.workId == workId } }
             }.collectAsState(initial = null)
 
+            val inLibrary by remember(workId) { isDownloaded(workId) }.collectAsState(initial = false)
+            val runningNow by running.collectAsState()
+
             DownloadBar(
                 entry = entry,
+                progress = runningNow?.takeIf { it.workId == workId }?.progress,
+                inLibrary = inLibrary,
                 online = online,
                 onDownload = { scope.launch { queue.enqueue(workId) } },
                 onCancel = { onCancelDownload(workId) },
+                onRead = { onReadWork(workId) },
             )
         }
 
@@ -138,30 +157,74 @@ fun BrowseScreen(
             canGoForward = canGoForward,
             onBack = ::goBack,
             onForward = ::goForward,
+            loading = loading,
             onRefresh = ::refresh,
+            onStop = ::stop,
             onOpenQueue = onOpenQueue,
             onOpenLibrary = onOpenLibrary,
         )
     }
 }
 
+/**
+ * The bar for the work page you're on: download it, follow a download in progress, or, once it's in the library, read
+ * it or fetch the latest version.
+ */
 @Composable
 private fun DownloadBar(
     entry: DownloadQueueEntity?,
+    /** Set only while this work is the one downloading. */
+    progress: DownloadProgress?,
+    inLibrary: Boolean,
     online: Boolean,
     onDownload: () -> Unit,
     onCancel: () -> Unit,
+    onRead: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(modifier = modifier.fillMaxWidth(), tonalElevation = 6.dp) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (queueShowsCancel(entry)) {
-                OutlinedButton(onClick = onCancel) { Text("Cancel download") }
-            } else {
-                Button(onClick = onDownload) { Text(queueButtonLabel(entry)) }
+    // contentColor is explicit: in Pep's palette surfaceContainer and surfaceVariant are the same grey, and Material's
+    // lookup by colour would otherwise pick the muted onSurfaceVariant for all of the bar's text.
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+    ) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            when {
+                queueShowsCancel(entry) -> {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            queueStatusLabel(entry, online, progress).orEmpty(),
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f),
+                        )
+                        TextButton(onClick = onCancel) { Text("Cancel download") }
+                    }
+                    DownloadProgressIndicator(progress)
+                }
+                entry == null && inLibrary -> Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("In your library", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                    // Update fetches AO3's current version: new chapters of a work in progress, or an author's edits.
+                    TextButton(onClick = onDownload) { Text("Update") }
+                    Button(onClick = onRead) { Text("Read") }
+                }
+                else -> {
+                    Button(onClick = onDownload) { Text(queueButtonLabel(entry)) }
+                    queueStatusLabel(entry, online)?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
             }
-            queueStatusLabel(entry, online)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
         }
+    }
+}
+
+/** Shows how far a page has loaded as a clear accent bar along the top; it starts at a tenth so it's seen at once. */
+@Composable
+private fun PageLoadBar(progress: Int, modifier: Modifier = Modifier) {
+    val shown by animateFloatAsState((progress.coerceIn(10, 100)) / 100f, label = "pageLoad")
+    Box(modifier.fillMaxWidth().height(3.dp)) {
+        Box(Modifier.fillMaxWidth(shown).fillMaxHeight().background(MaterialTheme.colorScheme.primary))
     }
 }
 

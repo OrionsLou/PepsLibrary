@@ -8,6 +8,9 @@ import app.pepslibrary.data.countsAsAttempt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 private const val TAG = "PepsLibrary"
@@ -21,15 +24,18 @@ private const val DOWNLOAD_DELAY_MS = 5_000L
  */
 private const val IDLE_POLL_MS = 3_000L
 
+/** [workId]'s download and what it's doing right now. */
+data class RunningDownload(val workId: Long, val progress: DownloadProgress)
+
 /**
  * Drains the download queue one work at a time. [download] is a plain function rather than [EpubDownloader]
  * itself, so this can be unit-tested without real networking or file I/O. Its receiver is that download's own
- * [DownloadCanceller], which [cancel] uses to stop it.
+ * [DownloadHandle], which [cancel] uses to stop it.
  */
 class DownloadQueueProcessor(
     private val queue: DownloadQueueRepository,
     private val library: LibraryRepository,
-    private val download: suspend DownloadCanceller.(workId: Long) -> DownloadResult,
+    private val download: suspend DownloadHandle.(workId: Long) -> DownloadResult,
     /**
      * While false, nothing starts: an outage shouldn't burn through every queued work's retry attempts. Checked
      * again after a network failure, which then doesn't count as an attempt if the connection has gone.
@@ -38,8 +44,13 @@ class DownloadQueueProcessor(
     /** Runs after a success is saved and dequeued, so a failure here can never leave the work stuck in the queue. */
     private val afterSuccess: suspend (workId: Long, result: DownloadResult.Success) -> Unit = { _, _ -> },
 ) {
-    /** The work downloading right now and its canceller. Guarded by `this`: [cancel] runs on another thread. */
-    private var current: Pair<Long, DownloadCanceller>? = null
+    /** The work downloading right now and its handle. Guarded by `this`: [cancel] runs on another thread. */
+    private var current: Pair<Long, DownloadHandle>? = null
+
+    private val runningState = MutableStateFlow<RunningDownload?>(null)
+
+    /** The download in progress and how far it has got, or null when none is running. For the progress on screen. */
+    val running: StateFlow<RunningDownload?> = runningState.asStateFlow()
 
     /**
      * Stops [workId]'s download if it's the one running, and takes it off the queue either way. A running
@@ -55,24 +66,26 @@ class DownloadQueueProcessor(
     suspend fun processNext(): Boolean {
         if (!isOnline()) return false
         val next = queue.nextEligible() ?: return false
-        val canceller = DownloadCanceller()
+        val handle = DownloadHandle { runningState.value = RunningDownload(next.workId, it) }
         // Set before the row shows IN_PROGRESS, which is when the UI starts offering Cancel.
-        synchronized(this) { current = next.workId to canceller }
+        synchronized(this) { current = next.workId to handle }
+        runningState.value = RunningDownload(next.workId, DownloadProgress.LoadingPage)
         try {
             queue.markInProgress(next.workId)
-            val result = runDownload(next.workId, canceller)
+            val result = runDownload(next.workId, handle)
             // A failure racing a cancel (the network dropped just as Cancel was tapped) must not be queued for retry.
-            val cancelled = result is DownloadResult.Failure && canceller.isCancelled
-            handle(next.workId, if (cancelled) DownloadResult.Cancelled else result)
+            val cancelled = result is DownloadResult.Failure && handle.isCancelled
+            record(next.workId, if (cancelled) DownloadResult.Cancelled else result)
         } finally {
             synchronized(this) { current = null }
+            runningState.value = null
         }
         return true
     }
 
-    private suspend fun runDownload(workId: Long, canceller: DownloadCanceller): DownloadResult =
+    private suspend fun runDownload(workId: Long, handle: DownloadHandle): DownloadResult =
         try {
-            canceller.download(workId)
+            handle.download(workId)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -82,7 +95,7 @@ class DownloadQueueProcessor(
             DownloadResult.Failure(FailureKind.NETWORK, e.message ?: e.javaClass.simpleName)
         }
 
-    private suspend fun handle(workId: Long, result: DownloadResult) {
+    private suspend fun record(workId: Long, result: DownloadResult) {
         when (result) {
             is DownloadResult.Success -> {
                 library.saveDownload(workId, result)

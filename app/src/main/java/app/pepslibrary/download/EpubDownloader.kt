@@ -36,7 +36,7 @@ sealed interface DownloadResult {
         val chapters: List<EpubChapter>? = null,
     ) : DownloadResult
 
-    /** Stopped by [DownloadCanceller.cancel] before the new copy was saved; any existing copy is untouched. */
+    /** Stopped by [DownloadHandle.cancel] before the new copy was saved; any existing copy is untouched. */
     data object Cancelled : DownloadResult
 
     data class Failure(
@@ -47,11 +47,24 @@ sealed interface DownloadResult {
     ) : DownloadResult
 }
 
+/** What a running download is doing, for the progress shown on screen. */
+sealed interface DownloadProgress {
+    /** Fetching the work page, to find the EPUB link. */
+    data object LoadingPage : DownloadProgress
+
+    /** The EPUB has been asked for; AO3 can take a while to build one for a long work before the first byte. */
+    data object WaitingForAo3 : DownloadProgress
+
+    /** [total] is from AO3's Content-Length, or null when it didn't send one. */
+    data class Receiving(val bytes: Long, val total: Long?) : DownloadProgress
+}
+
 /**
- * Lets another thread stop a download mid-request. Cancelling cancels the OkHttp call in flight, which closes its
- * connection, so even a stalled read ends at once instead of waiting out the read timeout. One per download.
+ * One per download. Another thread can stop it: cancelling cancels the OkHttp call in flight, which closes its
+ * connection, so even a stalled read ends at once instead of waiting out the read timeout. And the download reports
+ * how far it has got through it, to [onProgress].
  */
-class DownloadCanceller {
+class DownloadHandle(private val onProgress: (DownloadProgress) -> Unit = {}) {
     private var cancelled = false
     private var call: Call? = null
 
@@ -64,6 +77,8 @@ class DownloadCanceller {
         call?.cancel()
     }
 
+    internal fun report(progress: DownloadProgress) = onProgress(progress)
+
     /** Tracks [call] as the request in flight, cancelling it straight away if [cancel] already happened. */
     @Synchronized
     internal fun track(call: Call): Call {
@@ -73,6 +88,9 @@ class DownloadCanceller {
     }
 }
 
+/** Often enough for a smooth bar, rarely enough not to flood the UI with updates. */
+private const val PROGRESS_STEP_BYTES = 16 * 1024L
+
 /**
  * Downloads one work as an EPUB: load the work page, find the EPUB link, fetch it. The EPUB bundles every
  * chapter, so a work costs one download however long it is. Blocking; call it off the main thread. It never
@@ -81,23 +99,24 @@ class DownloadCanceller {
 class EpubDownloader(private val client: OkHttpClient, private val worksDir: File) {
 
     /**
-     * Once the new file has replaced the old one the download counts as done, so a [canceller] cancel that arrives
+     * Once the new file has replaced the old one the download counts as done, so a [handle] cancel that arrives
      * after that point still returns Success: the caller must save it, or the library would miss a file on disk.
      */
-    fun download(workId: Long, canceller: DownloadCanceller = DownloadCanceller()): DownloadResult {
-        if (canceller.isCancelled) return DownloadResult.Cancelled
+    fun download(workId: Long, handle: DownloadHandle = DownloadHandle()): DownloadResult {
+        if (handle.isCancelled) return DownloadResult.Cancelled
         return try {
-            fetchAndSave(workId, canceller)
+            fetchAndSave(workId, handle)
         } catch (e: IOException) {
             // A cancelled call surfaces as an IOException ("Canceled", or a closed socket mid-read).
-            if (canceller.isCancelled) DownloadResult.Cancelled
+            if (handle.isCancelled) DownloadResult.Cancelled
             else DownloadResult.Failure(FailureKind.NETWORK, e.message ?: e.javaClass.simpleName)
         }
     }
 
-    private fun fetchAndSave(workId: Long, canceller: DownloadCanceller): DownloadResult {
+    private fun fetchAndSave(workId: Long, handle: DownloadHandle): DownloadResult {
+        handle.report(DownloadProgress.LoadingPage)
         val pageRequest = Request.Builder().url(Ao3.workUrl(workId)).build()
-        val page = canceller.track(client.newCall(pageRequest)).execute().use { response ->
+        val page = handle.track(client.newCall(pageRequest)).execute().use { response ->
             failureFor(response, "work page")?.let { return it }
             response.request.url.toString() to response.requireBody().string()
         }
@@ -110,18 +129,25 @@ class EpubDownloader(private val client: OkHttpClient, private val worksDir: Fil
             )
 
         val epubRequest = Request.Builder().url(epubUrl).header("Referer", pageUrl).build()
-        return canceller.track(client.newCall(epubRequest)).execute().use { response ->
+        handle.report(DownloadProgress.WaitingForAo3)
+        return handle.track(client.newCall(epubRequest)).execute().use { response ->
             failureFor(response, "EPUB file")?.let { return it }
-            save(workId, epubUrl, Ao3.parseWorkMetadata(html), response)
+            save(workId, epubUrl, Ao3.parseWorkMetadata(html), response, handle)
         }
     }
 
-    private fun save(workId: Long, epubUrl: String, metadata: WorkMetadata, response: Response): DownloadResult {
+    private fun save(
+        workId: Long,
+        epubUrl: String,
+        metadata: WorkMetadata,
+        response: Response,
+        handle: DownloadHandle,
+    ): DownloadResult {
         worksDir.mkdirs()
         val target = File(worksDir, "$workId.epub")
         val part = File(worksDir, "$workId.epub.part")
         try {
-            response.requireBody().byteStream().use { input -> part.outputStream().use { input.copyTo(it) } }
+            copyReporting(response, part, handle)
             if (!looksLikeZip(part)) {
                 return DownloadResult.Failure(
                     FailureKind.NOT_AN_EPUB,
@@ -142,6 +168,31 @@ class EpubDownloader(private val client: OkHttpClient, private val worksDir: Fil
         } finally {
             part.delete() // gone already after a successful move; cleans up any partial or rejected download
         }
+    }
+
+    /** Writes the body to [target], reporting the bytes so far about every [PROGRESS_STEP_BYTES] and once at the end. */
+    private fun copyReporting(response: Response, target: File, handle: DownloadHandle) {
+        val body = response.requireBody()
+        val total = body.contentLength().takeIf { it > 0 }
+        var bytes = 0L
+        var reported = 0L
+        handle.report(DownloadProgress.Receiving(0, total))
+        body.byteStream().use { input ->
+            target.outputStream().use { output ->
+                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read < 0) break
+                    output.write(buffer, 0, read)
+                    bytes += read
+                    if (bytes - reported >= PROGRESS_STEP_BYTES) {
+                        reported = bytes
+                        handle.report(DownloadProgress.Receiving(bytes, total))
+                    }
+                }
+            }
+        }
+        if (bytes != reported) handle.report(DownloadProgress.Receiving(bytes, total))
     }
 
     /** Maps AO3's and Cloudflare's "no" answers to a Failure; null means the response is good to read. */

@@ -80,6 +80,9 @@ fun PepsLibraryApp() {
         BrowseScreen(
             queue = queue,
             onCancelDownload = cancelDownload,
+            running = processor.running,
+            isDownloaded = repository::isDownloaded,
+            onReadWork = { workId -> context.startActivity(ReaderActivity.intent(context, workId)) },
             onOpenQueue = { showQueue = true },
             onOpenLibrary = { showLibrary = true },
         )
@@ -87,9 +90,11 @@ fun PepsLibraryApp() {
         if (showQueue) {
             val entries by queue.entries.collectAsState(initial = emptyList())
             val online by NetworkMonitor.get(context).isOnline.collectAsState()
+            val running by processor.running.collectAsState()
             QueueScreen(
                 entries = entries,
                 online = online,
+                running = running,
                 onRetry = { workId -> scope.launch { queue.enqueue(workId) } },
                 onRemove = cancelDownload,
                 onBack = { showQueue = false },
