@@ -58,7 +58,7 @@ fun QueueScreen(
                 IconButton(onClick = onBack) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to browser")
                 }
-                Text("Downloads", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                Text("Download queue", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
             }
             Shelf {
                 if (entries.isNotEmpty()) {
