@@ -212,6 +212,13 @@ Ideas worth keeping but not scheduled into any step. Pick one up only if a real 
    - Import restores into an empty library (or merges, keeping the newer copy per work) and must handle archives from older schema versions.
    - Only matters if a phone migration is coming up. Until then, re-downloading is an acceptable cost.
 
+2. **Import my own app icon** *(from step 12, 2026-09-27)*. I may draw my own version of the icon to replace the current one (Pep sitting on two books). A draft direction was explored and set aside: Pep peeking over the top of a book with paws resting on it, as a flat grey silhouette keeping only round glasses, whiskers and tabby stripes, on the coat background with an eye-green book. What importing needs:
+   - *Format:* SVG preferred, converted to a VectorDrawable (as the current `ic_launcher_foreground.xml` was); a PNG of at least 432×432 px works but won't be as sharp. Downloading or copying the file in follows the usual rule: ask first.
+   - *Canvas:* square, 108 units. Everything that matters stays inside the central 66-unit circle (the safe zone); launchers crop to circles, squircles and other shapes outside it. Check it under circle and squircle masks and at 48px and 32px before converting.
+   - *Layers:* the background is `ic_launcher_background` (a colour, currently coat `#F2F2F0`) and the artwork is `ic_launcher_foreground`. The foreground is also the system splash icon and the opening animation's image (`ui/OpeningScreen.kt`), so both update automatically; the splash draws it at 288dp in a 192dp circle, which the opening screen matches.
+   - *Themed icon:* `ic_launcher_monochrome.xml` is the one-colour version for Android 13's themed icons; derive it from the artwork if I don't supply one (details cut out of the shape rather than drawn in a second colour).
+   - *Opening animation:* a peeking pose would suit Pep peeking up from behind the book before the name appears, instead of the current rise.
+
 ## 6. Suggested architecture
 
 - **Layers:** UI (Compose screens), data (Room, download storage), network (OkHttp with WebView cookie jar), and an isolated AO3 "adapter" layer holding all selectors, injected JS, and parsing.
