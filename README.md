@@ -59,6 +59,8 @@ in-app, download whole works as EPUBs, read them offline, and resume exactly whe
   the library.
 - The reader has a bottom bar for moving around a work: a slider that steps page by page with a chapter and
   percent preview, and a **Chapters** list that jumps to any chapter. Tap the middle of the page to show or hide it.
+- Three reading themes, Light, Sepia and Dark, switched by a button in that bar (each tap moves to the next). The
+  reader's bars follow the page, and the choice is remembered.
 - Re-downloading a work in progress keeps your place. New chapters appended, or edits to other chapters, leave the
   saved position exactly where it was, and if an earlier chapter was added or removed the position follows your
   chapter to its new place in the book. If the chapter you were reading was itself edited, the reader opens at the

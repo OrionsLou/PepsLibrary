@@ -2,6 +2,7 @@ package app.pepslibrary.ui.theme
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import app.pepslibrary.settings.ReadingTheme
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -36,6 +37,24 @@ class PepsPaletteTest {
             assertReadable("nose", nose, bg)
         }
         assertReadable("coat on eye (buttons)", coat, eye)
+    }
+
+    @Test
+    fun sepiaTextRolesAreReadable() = with(PepsPalette.Sepia) {
+        listOf(paper, undercoat).forEach { bg ->
+            assertReadable("ink", ink, bg)
+            assertReadable("muted", muted, bg)
+            assertReadable("eye", eye, bg)
+        }
+        assertReadable("white on eye (buttons)", Color.White, eye)
+    }
+
+    @Test
+    fun everyReadingPageIsReadable() {
+        ReadingTheme.entries.forEach { theme ->
+            val (page, text) = pageColors(theme)
+            assertReadable("$theme page", text, page)
+        }
     }
 
     @Test

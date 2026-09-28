@@ -2,6 +2,7 @@ package app.pepslibrary.reader
 
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.os.Bundle
 import android.util.Log
 import android.view.View
@@ -9,14 +10,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -27,15 +25,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -43,6 +43,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -57,6 +58,11 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -66,13 +72,18 @@ import androidx.fragment.app.FragmentContainerView
 import androidx.fragment.app.commitNow
 import androidx.lifecycle.lifecycleScope
 import app.pepslibrary.AppScope
-import app.pepslibrary.data.DownloadQueueRepository
 import app.pepslibrary.data.AppDatabase
-import app.pepslibrary.ui.theme.PepsTheme
+import app.pepslibrary.data.DownloadQueueRepository
 import app.pepslibrary.data.LibraryRepository
 import app.pepslibrary.data.PositionNotice
 import app.pepslibrary.data.ReadingProgressRepository
+import app.pepslibrary.settings.AppSettings
+import app.pepslibrary.settings.ReadingTheme
 import app.pepslibrary.ui.isOpenableExternally
+import app.pepslibrary.ui.theme.PepsTheme
+import app.pepslibrary.ui.theme.pageColors
+import java.io.File
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.coroutineScope
@@ -82,8 +93,11 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
+import org.readium.r2.navigator.epub.EpubPreferences
 import org.readium.r2.navigator.input.InputListener
 import org.readium.r2.navigator.input.TapEvent
+import org.readium.r2.navigator.preferences.Color as ReadiumColor
+import org.readium.r2.navigator.preferences.Theme
 import org.readium.r2.navigator.util.DirectionalNavigationAdapter
 import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.publication.Link
@@ -91,8 +105,6 @@ import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.publication.Publication
 import org.readium.r2.shared.publication.services.positions
 import org.readium.r2.shared.util.AbsoluteUrl
-import java.io.File
-import kotlin.math.roundToInt
 
 /**
  * Reads one downloaded work in Readium's EPUB navigator, restoring the saved position on open and saving it as
@@ -122,6 +134,8 @@ class ReaderActivity : FragmentActivity() {
     private var current by mutableStateOf<Locator?>(null)
     private var showControls by mutableStateOf(true)
     private var showChapters by mutableStateOf(false)
+    private var readingTheme by mutableStateOf(ReadingTheme.LIGHT)
+    private lateinit var settings: AppSettings
 
     private var workId = -1L
     private var publication: Publication? = null
@@ -141,9 +155,12 @@ class ReaderActivity : FragmentActivity() {
         }
         val db = AppDatabase.get(this)
         progress = ReadingProgressRepository(db.readingProgressDao())
+        settings = AppSettings.get(this)
+        val phoneDark = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
+        readingTheme = ReadingTheme.resolve(settings.readingTheme.value, settings.themeMode.value.isDark(phoneDark))
 
         setContent {
-            PepsTheme {
+            PepsTheme(reading = readingTheme) {
                 Surface(Modifier.fillMaxSize()) {
                     Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                         ReaderBar(title = workTitle, percent = percentRead, onClose = ::finish)
@@ -172,6 +189,8 @@ class ReaderActivity : FragmentActivity() {
                                                 chapterOf = ::chapterTitleOf,
                                                 onSeek = { navigator?.go(it, animated = false) },
                                                 onOpenChapters = { showChapters = true },
+                                                readingTheme = readingTheme,
+                                                onCycleReadingTheme = ::cycleReadingTheme,
                                                 onClose = { showControls = false },
                                             )
                                         }
@@ -196,6 +215,13 @@ class ReaderActivity : FragmentActivity() {
         }
 
         lifecycleScope.launch { load(db) }
+    }
+
+    /** The seeking bar's theme button: Light, Sepia, Dark and round again, applied at once and remembered. */
+    private fun cycleReadingTheme() {
+        readingTheme = readingTheme.next()
+        settings.setReadingTheme(readingTheme)
+        navigator?.submitPreferences(epubPreferences(readingTheme))
     }
 
     /**
@@ -255,7 +281,11 @@ class ReaderActivity : FragmentActivity() {
                 positions = withContext(Dispatchers.IO) { pub.positions() }
                 val initial = saved?.let { locatorFromJson(it.locatorJson) }
                 supportFragmentManager.fragmentFactory = EpubNavigatorFactory(opened.publication)
-                    .createFragmentFactory(initialLocator = initial, listener = navigatorListener)
+                    .createFragmentFactory(
+                        initialLocator = initial,
+                        initialPreferences = epubPreferences(readingTheme),
+                        listener = navigatorListener,
+                    )
                 state = State.Ready
             }
         }
@@ -372,6 +402,23 @@ internal fun noticeMessage(notice: PositionNotice): String = when (notice) {
         "The chapter you were reading isn't in the latest update any more, so you're back at the start of the work."
 }
 
+/**
+ * Readium's own theme (which also sets link and selection colours to suit), with the page and text colours tuned to
+ * Pep's palette.
+ */
+private fun epubPreferences(theme: ReadingTheme): EpubPreferences {
+    val (page, text) = pageColors(theme)
+    return EpubPreferences(
+        theme = when (theme) {
+            ReadingTheme.LIGHT -> Theme.LIGHT
+            ReadingTheme.SEPIA -> Theme.SEPIA
+            ReadingTheme.DARK -> Theme.DARK
+        },
+        backgroundColor = ReadiumColor(page.toArgb()),
+        textColor = ReadiumColor(text.toArgb()),
+    )
+}
+
 @Composable
 private fun NoticeBanner(message: String, onClose: () -> Unit) {
     Surface(color = MaterialTheme.colorScheme.secondaryContainer) {
@@ -395,6 +442,8 @@ private fun ReaderControls(
     chapterOf: (Locator) -> String?,
     onSeek: (Locator) -> Unit,
     onOpenChapters: () -> Unit,
+    readingTheme: ReadingTheme,
+    onCycleReadingTheme: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -446,12 +495,39 @@ private fun ReaderControls(
                 valueRange = 0f..positions.lastIndex.toFloat(),
                 modifier = Modifier.padding(end = 12.dp),
             )
-            TextButton(onClick = onOpenChapters) {
-                Icon(Icons.AutoMirrored.Filled.List, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Chapters")
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 8.dp)) {
+                TextButton(onClick = onOpenChapters) {
+                    Icon(Icons.AutoMirrored.Filled.List, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Chapters")
+                }
+                Spacer(Modifier.weight(1f))
+                ReadingThemeButton(readingTheme, onCycleReadingTheme)
             }
         }
+    }
+}
+
+/**
+ * Shows the current reading theme as a half-and-half circle of its page and text colours (the familiar "appearance"
+ * symbol, which also stays visible against a bar of nearly the page's colour) and its name. Each tap moves on.
+ */
+@Composable
+private fun ReadingThemeButton(theme: ReadingTheme, onClick: () -> Unit) {
+    val (page, text) = pageColors(theme)
+    TextButton(
+        onClick = onClick,
+        modifier = Modifier.semantics {
+            contentDescription = "Reading theme: ${theme.label}. Tap for ${theme.next().label}."
+        },
+    ) {
+        Canvas(Modifier.size(18.dp)) {
+            drawCircle(page)
+            drawArc(text, startAngle = 90f, sweepAngle = 180f, useCenter = true)
+            drawCircle(text, style = Stroke(width = 1.dp.toPx()))
+        }
+        Spacer(Modifier.width(8.dp))
+        Text(theme.label)
     }
 }
 

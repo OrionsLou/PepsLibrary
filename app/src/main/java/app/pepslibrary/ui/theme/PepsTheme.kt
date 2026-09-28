@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import app.pepslibrary.R
 import app.pepslibrary.settings.AppSettings
+import app.pepslibrary.settings.ReadingTheme
 
 /**
  * Pep's colours: a grey tabby's coat, undercoat and stripes, with eye green as the accent and nose pink for small
@@ -36,6 +37,16 @@ object PepsPalette {
         val whisker = Color(0xFFCFCCC7)
         val eye = Color(0xFF566420)
         val nose = Color(0xFFB8656B)
+    }
+
+    /** Only for reading: warm paper, for the reader's pages and its bars while the Sepia theme is on. */
+    object Sepia {
+        val paper = Color(0xFFF4ECD8)
+        val undercoat = Color(0xFFEADFC6)
+        val ink = Color(0xFF3B3025)
+        val muted = Color(0xFF6E5F4E)
+        val eye = Color(0xFF566420)
+        val nose = Color(0xFFA85A60)
     }
 
     object Dark {
@@ -107,6 +118,45 @@ private val DarkColors = with(PepsPalette.Dark) {
     )
 }
 
+private val SepiaColors = with(PepsPalette.Sepia) {
+    lightColorScheme(
+        primary = eye,
+        onPrimary = Color.White,
+        primaryContainer = Color(0xFFDCE3B8),
+        onPrimaryContainer = Color(0xFF2A3208),
+        secondary = muted,
+        onSecondary = Color.White,
+        secondaryContainer = Color(0xFFE3D5B5),
+        onSecondaryContainer = ink,
+        tertiary = nose,
+        onTertiary = Color.White,
+        background = paper,
+        onBackground = ink,
+        surface = paper,
+        onSurface = ink,
+        surfaceVariant = undercoat,
+        onSurfaceVariant = muted,
+        surfaceTint = eye,
+        outline = Color(0xFF9C8C74),
+        outlineVariant = Color(0xFFD9CBAA),
+        surfaceContainerLowest = Color(0xFFFAF5E9),
+        surfaceContainerLow = Color(0xFFF0E6CF),
+        surfaceContainer = undercoat,
+        surfaceContainerHigh = Color(0xFFE4D8BC),
+        surfaceContainerHighest = Color(0xFFDDD0B2),
+    )
+}
+
+/**
+ * The page itself in each reading theme, handed to Readium. Dark pages use a slightly softer text than the app's
+ * own, which is easier on the eyes over a long read at night.
+ */
+fun pageColors(theme: ReadingTheme): Pair<Color, Color> = when (theme) {
+    ReadingTheme.LIGHT -> PepsPalette.Light.coat to PepsPalette.Light.stripe
+    ReadingTheme.SEPIA -> PepsPalette.Sepia.paper to PepsPalette.Sepia.ink
+    ReadingTheme.DARK -> PepsPalette.Dark.coat to Color(0xFFDDD9D2)
+}
+
 /** Literata is a variable font: one file, with each weight picked through its wght axis. */
 @OptIn(ExperimentalTextApi::class)
 private fun literata(weight: FontWeight) =
@@ -143,11 +193,18 @@ private const val DARK_SCRIM = 0x801B1B1B.toInt()
  * The app's theme: light or dark per the in-app setting (following the phone by default). Also sets the status- and
  * navigation-bar icons to match, since the platform otherwise picks them from the phone's setting alone, which left
  * white icons on a white app when the phone was dark.
+ *
+ * The reader passes its [reading] theme instead, so its bars match the page: Light, Sepia or Dark.
  */
 @Composable
-fun PepsTheme(content: @Composable () -> Unit) {
+fun PepsTheme(reading: ReadingTheme? = null, content: @Composable () -> Unit) {
     val mode by AppSettings.get(LocalContext.current).themeMode.collectAsState()
-    val dark = mode.isDark(systemDark = isSystemInDarkTheme())
+    val dark = reading?.let { it == ReadingTheme.DARK } ?: mode.isDark(systemDark = isSystemInDarkTheme())
+    val colors = when {
+        reading == ReadingTheme.SEPIA -> SepiaColors
+        dark -> DarkColors
+        else -> LightColors
+    }
 
     val activity = LocalContext.current as? ComponentActivity
     DisposableEffect(activity, dark) {
@@ -161,5 +218,5 @@ fun PepsTheme(content: @Composable () -> Unit) {
         onDispose {}
     }
 
-    MaterialTheme(colorScheme = if (dark) DarkColors else LightColors, typography = PepsTypography, content = content)
+    MaterialTheme(colorScheme = colors, typography = PepsTypography, content = content)
 }
