@@ -32,6 +32,13 @@ object Ao3 {
     private val ISO_DATE = Regex("^\\d{4}-\\d{2}-\\d{2}$")
     private val UPDATED_AT_PARAM = Regex("[?&]updated_at=(\\d+)")
 
+    /**
+     * A chapter page's browser title: "<title> - Chapter 3 - <author> - <fandom> [Archive of Our Own]". A one-chapter
+     * work's has no chapter part, and fandoms can contain " - " ("Harry Potter - J. K. Rowling"), so its title can't
+     * be told apart from the rest; only the chapter form is read. Verified against real work pages on 2026-09-27.
+     */
+    private val CHAPTER_PAGE_TITLE = Regex("^(.+?) - Chapter \\d+ - .+ \\[Archive of Our Own]$")
+
     // AO3's EPUBs are built by Calibre, one file per chapter, each opening with the chapter's heading
     // ("Chapter 1: The Maze"), plus Preface and Afterword files. Verified against a real download on 2026-09-26.
     private const val EPUB_HEADING_SELECTOR = "h1, h2, h3"
@@ -124,6 +131,14 @@ object Ao3 {
             updatedDate = date("status"), // labelled "Updated:" or, once finished, "Completed:"
         )
     }
+
+    /**
+     * The work's title from a work page's browser title (`WebView.getTitle()`), or null when it can't be read with
+     * certainty: always for a one-chapter work, see [CHAPTER_PAGE_TITLE]. The download fills in the exact title from
+     * the page itself once it runs.
+     */
+    fun workTitleFromPageTitle(pageTitle: String?): String? =
+        pageTitle?.trim()?.let { CHAPTER_PAGE_TITLE.find(it) }?.groupValues?.get(1)?.trim()?.takeIf { it.isNotEmpty() }
 
     /** The first heading in one of an AO3 EPUB's content files, e.g. "Chapter 1: The Maze". Null if it has none. */
     fun epubChapterHeading(xhtml: String): String? =

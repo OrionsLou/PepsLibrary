@@ -25,6 +25,9 @@ internal fun queueStatusLabel(
     else -> "Queued, waiting its turn..."
 }
 
+/** The work's title when known, else its AO3 ID. */
+internal fun queueRowTitle(entry: DownloadQueueEntity): String = entry.title ?: "Work ${entry.workId}"
+
 /** While a work is downloading, its button is Cancel; otherwise (not queued, waiting, failed) it (re-)starts it. */
 internal fun queueShowsCancel(entry: DownloadQueueEntity?): Boolean = entry?.status == QueueStatus.IN_PROGRESS
 

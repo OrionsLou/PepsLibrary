@@ -248,4 +248,33 @@ class DownloadQueueRepositoryTest {
         assertEquals("525", row.lastFailureMessage)
         assertNull(row.notBeforeMillis) // runs as soon as the connection is back
     }
+
+    // --- titles ---
+
+    @Test
+    fun aTitleGivenWhenQueuedIsStored() = runBlocking {
+        repository.enqueue(42, "Some Work")
+        assertEquals("Some Work", repository.get(42)!!.title)
+    }
+
+    @Test
+    fun reQueueingWithoutATitleKeepsTheStoredOne_andANewOneReplacesIt() = runBlocking {
+        repository.enqueue(42, "Old Title")
+        repeat(MAX_ATTEMPTS) { repository.recordFailure(42, failure(FailureKind.NETWORK)) }
+        repository.enqueue(42) // Retry from the Downloads screen
+        assertEquals("Old Title", repository.get(42)!!.title)
+
+        repository.enqueue(42, "New Title")
+        assertEquals("New Title", repository.get(42)!!.title)
+    }
+
+    @Test
+    fun aFailureAfterThePageLoadedStoresItsTitle_andOneWithoutKeepsTheStoredTitle() = runBlocking {
+        repository.enqueue(42)
+        repository.recordFailure(42, DownloadResult.Failure(FailureKind.NO_EPUB_LINK, "no link", title = "From The Page"))
+        assertEquals("From The Page", repository.get(42)!!.title)
+
+        repository.recordFailure(42, failure(FailureKind.NETWORK))
+        assertEquals("From The Page", repository.get(42)!!.title)
+    }
 }

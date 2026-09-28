@@ -119,9 +119,7 @@ private fun QueueRow(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        // No title yet: it's only known once the work page is actually fetched, which hasn't happened (or
-        // didn't succeed) for anything shown here. See HANDOFF's phase 3 UI-polish note if this feels too bare.
-        Text("Work ${entry.workId}", style = MaterialTheme.typography.titleMedium)
+        Text(queueRowTitle(entry), style = MaterialTheme.typography.titleMedium)
         queueStatusLabel(entry, online, progress)?.let {
             Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }

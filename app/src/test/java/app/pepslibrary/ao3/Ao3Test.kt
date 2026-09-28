@@ -3,6 +3,7 @@ package app.pepslibrary.ao3
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class Ao3Test {
@@ -117,5 +118,39 @@ class Ao3Test {
     @Test
     fun trailingDotHostIsRejectedConservatively() {
         assertRejected("https://archiveofourown.org./")
+    }
+
+    // --- workTitleFromPageTitle ---
+
+    @Test
+    fun aChapterPageTitleGivesTheWorkTitle() {
+        assertEquals(
+            "bulbs in the dirt",
+            Ao3.workTitleFromPageTitle(
+                "bulbs in the dirt - Chapter 1 - catwomanoftheeastend - Multifandom [Archive of Our Own]",
+            ),
+        )
+    }
+
+    @Test
+    fun aTitleContainingADashIsKeptWhole() {
+        assertEquals(
+            "Before - and After",
+            Ao3.workTitleFromPageTitle("Before - and After - Chapter 12 - someone - Harry Potter - J. K. Rowling [Archive of Our Own]"),
+        )
+    }
+
+    @Test
+    fun aOneChapterWorkIsAmbiguousSoGivesNoTitle() {
+        // The fandom's own " - " makes the title impossible to tell apart from the rest.
+        assertNull(Ao3.workTitleFromPageTitle("A Shocking Encounter - thelostriversong - Harry Potter - J. K. Rowling [Archive of Our Own]"))
+    }
+
+    @Test
+    fun otherTitlesGiveNoWorkTitle() {
+        assertNull(Ao3.workTitleFromPageTitle(null))
+        assertNull(Ao3.workTitleFromPageTitle(""))
+        assertNull(Ao3.workTitleFromPageTitle("archiveofourown.org/works/123"))
+        assertNull(Ao3.workTitleFromPageTitle("Just a moment..."))
     }
 }

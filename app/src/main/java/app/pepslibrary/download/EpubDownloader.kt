@@ -44,6 +44,8 @@ sealed interface DownloadResult {
         val message: String,
         /** From a 429's Retry-After header, when AO3 gave one in seconds. */
         val retryAfterSeconds: Long? = null,
+        /** The work's title, when the work page loaded before the failure. */
+        val title: String? = null,
     ) : DownloadResult
 }
 
@@ -104,16 +106,19 @@ class EpubDownloader(private val client: OkHttpClient, private val worksDir: Fil
      */
     fun download(workId: Long, handle: DownloadHandle = DownloadHandle()): DownloadResult {
         if (handle.isCancelled) return DownloadResult.Cancelled
-        return try {
-            fetchAndSave(workId, handle)
+        var title: String? = null
+        val result = try {
+            fetchAndSave(workId, handle) { title = it }
         } catch (e: IOException) {
             // A cancelled call surfaces as an IOException ("Canceled", or a closed socket mid-read).
             if (handle.isCancelled) DownloadResult.Cancelled
             else DownloadResult.Failure(FailureKind.NETWORK, e.message ?: e.javaClass.simpleName)
         }
+        return if (result is DownloadResult.Failure) result.copy(title = title) else result
     }
 
-    private fun fetchAndSave(workId: Long, handle: DownloadHandle): DownloadResult {
+    /** [onTitle] gets the work's title as soon as the page is read, so a later failure can still name the work. */
+    private fun fetchAndSave(workId: Long, handle: DownloadHandle, onTitle: (String?) -> Unit): DownloadResult {
         handle.report(DownloadProgress.LoadingPage)
         val pageRequest = Request.Builder().url(Ao3.workUrl(workId)).build()
         val page = handle.track(client.newCall(pageRequest)).execute().use { response ->
@@ -121,6 +126,8 @@ class EpubDownloader(private val client: OkHttpClient, private val worksDir: Fil
             response.request.url.toString() to response.requireBody().string()
         }
         val (pageUrl, html) = page
+        val metadata = Ao3.parseWorkMetadata(html)
+        onTitle(metadata.title)
 
         val epubUrl = Ao3.findEpubUrl(html, pageUrl)
             ?: return DownloadResult.Failure(
@@ -132,7 +139,7 @@ class EpubDownloader(private val client: OkHttpClient, private val worksDir: Fil
         handle.report(DownloadProgress.WaitingForAo3)
         return handle.track(client.newCall(epubRequest)).execute().use { response ->
             failureFor(response, "EPUB file")?.let { return it }
-            save(workId, epubUrl, Ao3.parseWorkMetadata(html), response, handle)
+            save(workId, epubUrl, metadata, response, handle)
         }
     }
 

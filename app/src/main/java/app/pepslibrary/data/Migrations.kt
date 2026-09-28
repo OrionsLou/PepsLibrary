@@ -32,6 +32,20 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
     }
 }
 
+/**
+ * 6 -> 7: adds the queued work's title, for the Downloads screen. A row for a work already in the library (an update
+ * waiting or failed) takes that work's title; anything else stays null and shows its ID until a download loads it.
+ */
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `download_queue` ADD COLUMN `title` TEXT")
+        db.execSQL(
+            "UPDATE `download_queue` SET `title` = " +
+                "(SELECT `title` FROM `works` WHERE `works`.`workId` = `download_queue`.`workId`)",
+        )
+    }
+}
+
 /** 5 -> 6: adds pinning. Every existing work starts unpinned. */
 val MIGRATION_5_6 = object : Migration(5, 6) {
     override fun migrate(db: SupportSQLiteDatabase) {
