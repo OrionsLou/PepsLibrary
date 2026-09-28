@@ -42,7 +42,7 @@ class SettingsSummaryTest {
     @Test
     fun theMeowNoteIsWordForWord() {
         assertEquals(
-            "Made this for me wife so that I may smother her with physical affection of which she is allergic to.",
+            "Made this for me wife so that I may smother her with physical affection while reading, of which she is allergic to.",
             MEOW_NOTE,
         )
     }

@@ -42,27 +42,27 @@ class WorkDisplayTest {
 
     @Test
     fun aCompleteMultiChapterWork() {
-        assertEquals("8,994 words · 3/3 chapters · Complete", workStatsLine(work(words = 8994, published = 3, total = 3)))
+        assertEquals("8,994 words, 3 of 3 chapters, complete", workStatsLine(work(words = 8994, published = 3, total = 3)))
     }
 
     @Test
     fun anUnfinishedWorkWithAPlannedTotal() {
-        assertEquals("120,000 words · 3/10 chapters · In progress", workStatsLine(work(words = 120000, published = 3, total = 10)))
+        assertEquals("120,000 words, 3 of 10 chapters, in progress", workStatsLine(work(words = 120000, published = 3, total = 10)))
     }
 
     @Test
     fun anUnfinishedWorkWithNoPlannedTotalShowsAQuestionMark() {
-        assertEquals("5,000 words · 4/? chapters · In progress", workStatsLine(work(words = 5000, published = 4, total = null)))
+        assertEquals("5,000 words, 4 of ? chapters, in progress", workStatsLine(work(words = 5000, published = 4, total = null)))
     }
 
     @Test
     fun aOneShotSaysOneChapterAndIsComplete() {
-        assertEquals("900 words · 1 chapter · Complete", workStatsLine(work(words = 900, published = 1, total = 1)))
+        assertEquals("900 words, 1 chapter, complete", workStatsLine(work(words = 900, published = 1, total = 1)))
     }
 
     @Test
     fun aOneChapterWorkThatIsPlannedToGrowIsInProgress() {
-        assertEquals("900 words · 1/5 chapters · In progress", workStatsLine(work(words = 900, published = 1, total = 5)))
+        assertEquals("900 words, 1 of 5 chapters, in progress", workStatsLine(work(words = 900, published = 1, total = 5)))
     }
 
     @Test
@@ -74,7 +74,7 @@ class WorkDisplayTest {
     fun partsWeDoNotKnowAreLeftOut() {
         assertEquals("", workStatsLine(work()))
         assertEquals("2,000 words", workStatsLine(work(words = 2000)))
-        assertEquals("2/2 chapters · Complete", workStatsLine(work(published = 2, total = 2)))
+        assertEquals("2 of 2 chapters, complete", workStatsLine(work(published = 2, total = 2)))
     }
 
     @Test
@@ -82,6 +82,10 @@ class WorkDisplayTest {
         assertEquals("Not started", readingProgressLabel(null))
         assertEquals("Not started", readingProgressLabel(0.0))
         assertEquals("Not started", readingProgressLabel(0.004))
+        // Opened but not read past the first page: says so, instead of "Not started" beside a "Last read" date.
+        assertEquals("Opened, not started", readingProgressLabel(null, opened = true))
+        assertEquals("Opened, not started", readingProgressLabel(0.004, opened = true))
+        assertEquals("42% read", readingProgressLabel(0.42, opened = true))
     }
 
     @Test
