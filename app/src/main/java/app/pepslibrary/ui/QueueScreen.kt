@@ -1,6 +1,5 @@
 package app.pepslibrary.ui
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,8 +48,6 @@ fun QueueScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    BackHandler(onBack = onBack)
-
     // The empty pointerInput swallows touches so they don't fall through to the WebView underneath.
     Surface(modifier.fillMaxSize().pointerInput(Unit) {}) {
         Column(Modifier.fillMaxSize()) {

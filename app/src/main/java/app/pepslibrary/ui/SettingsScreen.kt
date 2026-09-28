@@ -1,6 +1,5 @@
 package app.pepslibrary.ui
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -113,7 +112,6 @@ fun SettingsScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    BackHandler(onBack = onBack)
     var showMeow by rememberSaveable { mutableStateOf(false) }
     var showLicence by remember { mutableStateOf(false) }
 

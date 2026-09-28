@@ -1,6 +1,15 @@
 package app.pepslibrary.ui
 
 import android.webkit.WebSettings
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -28,7 +37,7 @@ import app.pepslibrary.reader.ReaderActivity
 import kotlinx.coroutines.launch
 import java.io.File
 
-/** The browser is always composed; the library slides over it, so the WebView keeps its page and history. */
+/** The browser is always composed; the other screens slide over it, so the WebView keeps its page and history. */
 @Composable
 fun PepsLibraryApp() {
     val context = LocalContext.current
@@ -87,7 +96,7 @@ fun PepsLibraryApp() {
             onOpenLibrary = { showLibrary = true },
         )
 
-        if (showQueue) {
+        OverlayScreen(visible = showQueue, onBack = { showQueue = false }) {
             val entries by queue.entries.collectAsState(initial = emptyList())
             val online by NetworkMonitor.get(context).isOnline.collectAsState()
             val running by processor.running.collectAsState()
@@ -101,7 +110,7 @@ fun PepsLibraryApp() {
             )
         }
 
-        if (showLibrary) {
+        OverlayScreen(visible = showLibrary, onBack = { showLibrary = false }) {
             val works by repository.works.collectAsState(initial = emptyList())
             val fractions by progress.fractions.collectAsState(initial = emptyMap())
             val queued by queue.entries.collectAsState(initial = emptyList())
@@ -127,7 +136,7 @@ fun PepsLibraryApp() {
             )
         }
 
-        if (showSettings) {
+        OverlayScreen(visible = showSettings, onBack = { showSettings = false }) {
             val settings = remember { AppSettings.get(context) }
             val themeMode by settings.themeMode.collectAsState()
             val readingTheme by settings.readingTheme.collectAsState()
@@ -147,5 +156,29 @@ fun PepsLibraryApp() {
                 onBack = { showSettings = false },
             )
         }
+    }
+}
+
+/** How long a screen takes to slide in; leaving is a little quicker, so going back feels responsive. */
+private const val SCREEN_ENTER_MS = 250
+private const val SCREEN_EXIT_MS = 200
+
+/**
+ * A screen drawn over the browser (Download queue, Library, Settings): it slides in a short way from the right while
+ * fading in, and going back reverses that. With Android's animations off it appears and goes at once. The system back
+ * button closes it, but only while it's showing: once it's on its way out, a second quick Back goes to whatever is
+ * underneath rather than being swallowed by the screen that's leaving.
+ */
+@Composable
+private fun OverlayScreen(visible: Boolean, onBack: () -> Unit, content: @Composable () -> Unit) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = slideInHorizontally(tween(SCREEN_ENTER_MS, easing = FastOutSlowInEasing)) { it / 8 } +
+            fadeIn(tween(SCREEN_ENTER_MS)),
+        exit = slideOutHorizontally(tween(SCREEN_EXIT_MS, easing = FastOutSlowInEasing)) { it / 8 } +
+            fadeOut(tween(SCREEN_EXIT_MS)),
+    ) {
+        BackHandler(enabled = transition.targetState == EnterExitState.Visible, onBack = onBack)
+        content()
     }
 }
