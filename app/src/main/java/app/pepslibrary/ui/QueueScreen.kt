@@ -18,6 +18,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -29,6 +30,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import app.pepslibrary.data.DownloadQueueEntity
 import app.pepslibrary.data.QueueStatus
+import app.pepslibrary.download.DownloadProgress
+import app.pepslibrary.download.RunningDownload
 
 /**
  * Everything currently queued or stuck at FAILED — the multi-item view; a work's own page only ever shows its
@@ -39,6 +42,8 @@ import app.pepslibrary.data.QueueStatus
 fun QueueScreen(
     entries: List<DownloadQueueEntity>,
     online: Boolean,
+    /** The download in progress, if any, and how far it has got. */
+    running: RunningDownload?,
     onRetry: (workId: Long) -> Unit,
     onRemove: (workId: Long) -> Unit,
     onBack: () -> Unit,
@@ -86,6 +91,7 @@ fun QueueScreen(
                             QueueRow(
                                 entry,
                                 online,
+                                progress = running?.takeIf { it.workId == entry.workId }?.progress,
                                 onRetry = { onRetry(entry.workId) },
                                 onRemove = { onRemove(entry.workId) },
                             )
@@ -102,7 +108,13 @@ fun QueueScreen(
 }
 
 @Composable
-private fun QueueRow(entry: DownloadQueueEntity, online: Boolean, onRetry: () -> Unit, onRemove: () -> Unit) {
+private fun QueueRow(
+    entry: DownloadQueueEntity,
+    online: Boolean,
+    progress: DownloadProgress?,
+    onRetry: () -> Unit,
+    onRemove: () -> Unit,
+) {
     Column(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -110,9 +122,10 @@ private fun QueueRow(entry: DownloadQueueEntity, online: Boolean, onRetry: () ->
         // No title yet: it's only known once the work page is actually fetched, which hasn't happened (or
         // didn't succeed) for anything shown here. See HANDOFF's phase 3 UI-polish note if this feels too bare.
         Text("Work ${entry.workId}", style = MaterialTheme.typography.titleMedium)
-        queueStatusLabel(entry, online)?.let {
+        queueStatusLabel(entry, online, progress)?.let {
             Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+        if (entry.status == QueueStatus.IN_PROGRESS) DownloadProgressIndicator(progress)
 
         // Remove and Cancel are the same action (stop it if running, then take it off the queue); the label
         // just says which one it is for this row.
@@ -122,5 +135,32 @@ private fun QueueRow(entry: DownloadQueueEntity, online: Boolean, onRetry: () ->
             }
             OutlinedButton(onClick = onRemove) { Text(if (queueShowsCancel(entry)) "Cancel" else "Remove") }
         }
+    }
+}
+
+/**
+ * A thin accent bar for a download in progress: filling up once the size is known, moving back and forth while AO3
+ * is still preparing the file or didn't say how big it is.
+ */
+@Composable
+internal fun DownloadProgressIndicator(progress: DownloadProgress?, modifier: Modifier = Modifier) {
+    val fraction = downloadProgressFraction(progress)
+    val barModifier = modifier.fillMaxWidth().height(3.dp)
+    if (fraction != null) {
+        LinearProgressIndicator(
+            progress = { fraction },
+            modifier = barModifier,
+            color = MaterialTheme.colorScheme.primary,
+            trackColor = MaterialTheme.colorScheme.outlineVariant,
+            gapSize = 0.dp,
+            drawStopIndicator = {},
+        )
+    } else {
+        LinearProgressIndicator(
+            modifier = barModifier,
+            color = MaterialTheme.colorScheme.primary,
+            trackColor = MaterialTheme.colorScheme.outlineVariant,
+            gapSize = 0.dp,
+        )
     }
 }

@@ -8,6 +8,7 @@ import app.pepslibrary.data.LibraryRepository
 import app.pepslibrary.data.QueueStatus
 import app.pepslibrary.data.WorkDao
 import app.pepslibrary.data.WorkEntity
+import java.io.File
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -17,7 +18,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.File
 
 class DownloadQueueProcessorTest {
     /** Same shape as DownloadQueueRepositoryTest's fake, plus nextEligible replicating the real query's filter. */
@@ -66,7 +66,7 @@ class DownloadQueueProcessorTest {
 
     private var online = true
 
-    private fun processor(download: suspend DownloadCanceller.(Long) -> DownloadResult) =
+    private fun processor(download: suspend DownloadHandle.(Long) -> DownloadResult) =
         DownloadQueueProcessor(
             queue,
             library,
@@ -334,5 +334,37 @@ class DownloadQueueProcessorTest {
         online = true
         assertTrue(p.processNext())
         assertEquals("Work 42", workDao.get(42)?.title)
+    }
+
+    // --- progress ---
+
+    @Test
+    fun theRunningDownloadAndItsProgressAreShownWhileItRuns_andClearedAfter() = runBlocking {
+        queue.enqueue(42)
+        var atStart: RunningDownload? = null
+        var midway: RunningDownload? = null
+        lateinit var p: DownloadQueueProcessor
+        p = processor { workId ->
+            atStart = p.running.value
+            report(DownloadProgress.Receiving(5, 10))
+            midway = p.running.value
+            success(workId)
+        }
+
+        p.processNext()
+
+        assertEquals(RunningDownload(42, DownloadProgress.LoadingPage), atStart)
+        assertEquals(RunningDownload(42, DownloadProgress.Receiving(5, 10)), midway)
+        assertNull(p.running.value)
+    }
+
+    @Test
+    fun progressIsClearedAfterAFailureToo() = runBlocking {
+        queue.enqueue(42)
+        val p = processor { failure(FailureKind.NETWORK) }
+
+        p.processNext()
+
+        assertNull(p.running.value)
     }
 }

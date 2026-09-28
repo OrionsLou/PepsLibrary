@@ -1,12 +1,20 @@
 package app.pepslibrary.download
 
 import app.pepslibrary.epub.TestEpub
+import java.io.File
+import java.io.IOException
+import java.net.ServerSocket
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import kotlin.concurrent.thread
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.Response
+import okhttp3.ResponseBody.Companion.asResponseBody
 import okhttp3.ResponseBody.Companion.toResponseBody
+import okio.Buffer
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -15,12 +23,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
-import java.io.File
-import java.io.IOException
-import java.net.ServerSocket
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
-import kotlin.concurrent.thread
 
 class EpubDownloaderTest {
     @get:Rule
@@ -325,9 +327,9 @@ class EpubDownloaderTest {
 
     @Test
     fun aDownloadCancelledBeforeItStartsMakesNoRequest() {
-        val canceller = DownloadCanceller().apply { cancel() }
+        val handle = DownloadHandle().apply { cancel() }
 
-        val result = downloader(::normalSite).download(workId, canceller)
+        val result = downloader(::normalSite).download(workId, handle)
 
         assertEquals(DownloadResult.Cancelled, result)
         assertTrue(requests.isEmpty())
@@ -337,11 +339,11 @@ class EpubDownloaderTest {
     fun aCancelBetweenTheWorkPageAndTheEpubStopsBeforeTheFile_andKeepsTheExistingCopy() {
         worksDir.mkdirs()
         val existing = File(worksDir, "$workId.epub").apply { writeBytes(byteArrayOf(9, 9, 9)) }
-        val canceller = DownloadCanceller()
+        val handle = DownloadHandle()
 
         val result = downloader { request ->
-            normalSite(request).also { if (request.url.encodedPath.startsWith("/works/")) canceller.cancel() }
-        }.download(workId, canceller)
+            normalSite(request).also { if (request.url.encodedPath.startsWith("/works/")) handle.cancel() }
+        }.download(workId, handle)
 
         assertEquals(DownloadResult.Cancelled, result)
         assertArrayEquals(byteArrayOf(9, 9, 9), existing.readBytes())
@@ -389,13 +391,13 @@ class EpubDownloaderTest {
                 chain.proceed(chain.request().newBuilder().url(url).build()).newBuilder().request(chain.request()).build()
             }
             .build()
-        val canceller = DownloadCanceller()
+        val handle = DownloadHandle()
         var result: DownloadResult? = null
-        val download = thread { result = EpubDownloader(client, worksDir).download(workId, canceller) }
+        val download = thread { result = EpubDownloader(client, worksDir).download(workId, handle) }
 
         assertTrue("server never reached the stall", stalled.await(10, TimeUnit.SECONDS))
         Thread.sleep(200) // let the client get into its blocking read
-        canceller.cancel()
+        handle.cancel()
         download.join(5_000)
 
         assertFalse("download still blocked after cancel", download.isAlive)
@@ -403,5 +405,42 @@ class EpubDownloaderTest {
         assertArrayEquals(byteArrayOf(9, 9, 9), existing.readBytes())
         assertEquals(listOf("$workId.epub"), worksDir.list()!!.toList())
         server.close()
+    }
+
+    // --- progress ---
+
+    @Test
+    fun progressGoesPageThenWaitingThenReceiving_endingWithEveryByte() {
+        val events = mutableListOf<DownloadProgress>()
+        downloader(::normalSite).download(workId, DownloadHandle { events += it })
+
+        assertEquals(DownloadProgress.LoadingPage, events[0])
+        assertEquals(DownloadProgress.WaitingForAo3, events[1])
+        assertEquals(DownloadProgress.Receiving(0, epubBytes.size.toLong()), events[2])
+        assertEquals(DownloadProgress.Receiving(epubBytes.size.toLong(), epubBytes.size.toLong()), events.last())
+    }
+
+    @Test
+    fun withoutAContentLengthTheTotalIsUnknown() {
+        val events = mutableListOf<DownloadProgress>()
+        downloader { request ->
+            if (request.url.encodedPath == epubPath) {
+                Response.Builder().request(request).protocol(Protocol.HTTP_1_1).code(200).message("test")
+                    .body(Buffer().write(epubBytes).asResponseBody("application/epub+zip".toMediaType(), -1L))
+                    .build()
+            } else {
+                normalSite(request)
+            }
+        }.download(workId, DownloadHandle { events += it })
+
+        assertEquals(DownloadProgress.Receiving(epubBytes.size.toLong(), null), events.last())
+    }
+
+    @Test
+    fun aFailedPageReportsOnlyThatItWasLoadingThePage() {
+        val events = mutableListOf<DownloadProgress>()
+        downloader { it.reply(code = 500) }.download(workId, DownloadHandle { events += it })
+
+        assertEquals(listOf<DownloadProgress>(DownloadProgress.LoadingPage), events)
     }
 }

@@ -28,6 +28,9 @@ in-app, download whole works as EPUBs, read them offline, and resume exactly whe
   AO3's own `Retry-After` on a 429, backing off on its own otherwise) before giving up. The bar reflects the
   work's queue status live: queued, downloading, retrying with the attempt count, or failed. The queue survives
   the app closing and resumes on reopen, but doesn't keep running once the app is fully closed.
+  While a download runs, the bar shows what it's doing (loading the work page, waiting for AO3 to prepare the file,
+  then how much has arrived, with a progress bar). For a work already in the library it says "In your library"
+  and offers **Read** and **Update**. While a page loads, a bar runs along the top and refresh becomes stop.
 - The **Downloads** button in the footer opens everything currently queued or failed, for a view across all
   works rather than just the one you're on. A failed item can be retried or removed from there, and a
   download in progress can be cancelled from there or from the work's own page; cancelling never touches an existing
@@ -87,7 +90,8 @@ Progress against the phased plan in [HANDOFF.md](HANDOFF.md):
 **Phase 2: making it pleasant**
 - [x] 6. Download button in the app's own chrome (no DOM injection into AO3's page)
 - [x] 7. Download queue
-- [~] 8. "Already downloaded" badges — data-layer check only (`isDownloaded`); visible badge deferred to 12
+- [x] 8. "Already downloaded" state: the Download bar says "In your library", with Read and Update (badges on AO3's
+  own pages were ruled out, to leave AO3's pages untouched)
 
 **Phase 3: polish**
 - [x] 9. WIP updates (keeps your place across re-downloads)
