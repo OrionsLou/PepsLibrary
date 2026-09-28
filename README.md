@@ -3,7 +3,7 @@
 A personal Android app that wraps [Archive of Our Own](https://archiveofourown.org) so I can browse and sign in
 in-app, download whole works as EPUBs, read them offline, and resume exactly where I left off.
 
-> **Status:** version 1.0.2 (tag `v1.0.2`). The planned app is complete: browse and sign in to AO3, download works
+> **Status:** version 1.0.3 (tag `v1.0.3`). The planned app is complete: browse and sign in to AO3, download works
 > as EPUBs, read them offline and pick up exactly where you left off, with a managed library and a finished look.
 > Next up is reading stats (Phase 4). See [HANDOFF.md](HANDOFF.md) for the goals, constraints and build plan.
 
@@ -44,13 +44,15 @@ in-app, download whole works as EPUBs, read them offline, and resume exactly whe
 Built and tested on a physical Android phone, installed by sideloading. On an emulator, AO3's Cloudflare check can
 block pages, so a real device on a normal connection is best for testing.
 
-## Fixes since 1.0.0
+## Changes since 1.0.0
 
 - **1.0.1:** pinning or unpinning a work in the library slides it smoothly to its new place, instead of the list
   snapping into the new order. 1.0.1 has no tag of its own; the fix is in `v1.0.2`.
 - **1.0.2:** AO3 links inside a book (the preface's links to the work, its tags, series and author) open in the
   app's own browser, where you're signed in, instead of the phone's browser. Back on that page returns to the book
   at the same spot. Other links still open in the phone's browser.
+- **1.0.3:** the screen stays on while you read. A new **Reader** section in Settings chooses Always (the default),
+  Timed (for a number of whole minutes after your last page turn or tap) or Off.
 
 ## Roadmap
 
