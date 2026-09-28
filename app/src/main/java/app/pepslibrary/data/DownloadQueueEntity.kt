@@ -24,4 +24,9 @@ data class DownloadQueueEntity(
     val lastFailureMessage: String?,
     /** Also the FIFO ordering key. */
     val enqueuedAt: Long,
+    /**
+     * The work's title, for the Downloads screen, when known: from the browser when it's queued, from the library
+     * for a re-download, or from the work page once a download has loaded it. Null shows the work ID instead.
+     */
+    val title: String? = null,
 )

@@ -230,7 +230,8 @@ class ReaderActivity : FragmentActivity() {
      */
     private fun redownload() {
         val queue = DownloadQueueRepository(AppDatabase.get(this).downloadQueueDao())
-        AppScope.launch { queue.enqueue(workId) }
+        val title = workTitle.ifEmpty { null }
+        AppScope.launch { queue.enqueue(workId, title) }
         finish()
     }
 

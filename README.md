@@ -32,7 +32,7 @@ in-app, download whole works as EPUBs, read them offline, and resume exactly whe
   then how much has arrived, with a progress bar). For a work already in the library it says "In your library"
   and offers **Read** and **Update**. While a page loads, a bar runs along the top and refresh becomes stop.
 - The **Downloads** button in the footer opens everything currently queued or failed, for a view across all
-  works rather than just the one you're on. A failed item can be retried or removed from there, and a
+  works rather than just the one you're on, each listed by its title. A failed item can be retried or removed from there, and a
   download in progress can be cancelled from there or from the work's own page; cancelling never touches an existing
   copy. While offline the queue pauses (without using up its retries) and resumes by itself once reconnected.
 - Each download is recorded in a local Room database, using metadata read from the work page that was already

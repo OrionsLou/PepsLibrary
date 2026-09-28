@@ -39,8 +39,12 @@ class DownloadQueueRepository(
     /** The oldest work that's ready to download right now, or null if the queue is empty or everything is waiting. */
     suspend fun nextEligible(): DownloadQueueEntity? = dao.nextEligible(QueueStatus.PENDING, now())
 
-    /** Adds a work to the queue, or resets it to a fresh attempt if it was already there (e.g. sitting at FAILED). */
-    suspend fun enqueue(workId: Long) {
+    /**
+     * Adds a work to the queue, or resets it to a fresh attempt if it was already there (e.g. sitting at FAILED).
+     * A null [title] keeps the one already stored, so a Retry from the Downloads screen doesn't lose it.
+     */
+    suspend fun enqueue(workId: Long, title: String? = null) {
+        val keptTitle = title ?: dao.get(workId)?.title
         dao.upsert(
             DownloadQueueEntity(
                 workId = workId,
@@ -50,6 +54,7 @@ class DownloadQueueRepository(
                 lastFailureKind = null,
                 lastFailureMessage = null,
                 enqueuedAt = now(),
+                title = keptTitle,
             ),
         )
     }
@@ -78,6 +83,8 @@ class DownloadQueueRepository(
                 lastFailureKind = failure.kind,
                 lastFailureMessage = failure.message,
                 enqueuedAt = existing?.enqueuedAt ?: now(),
+                // The work page may have loaded before the failure, giving the exact title.
+                title = failure.title ?: existing?.title,
             ),
         )
     }

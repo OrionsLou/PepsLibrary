@@ -117,4 +117,12 @@ class QueueDisplayTest {
         assertNull(downloadProgressFraction(DownloadProgress.WaitingForAo3))
         assertNull(downloadProgressFraction(null))
     }
+
+    // --- queueRowTitle ---
+
+    @Test
+    fun aRowShowsItsTitle_orItsIdWhenTheTitleIsUnknown() {
+        assertEquals("Some Work", queueRowTitle(entry(QueueStatus.PENDING).copy(title = "Some Work")))
+        assertEquals("Work 1", queueRowTitle(entry(QueueStatus.PENDING)))
+    }
 }

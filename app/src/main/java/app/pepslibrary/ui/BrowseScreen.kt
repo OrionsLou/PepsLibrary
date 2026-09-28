@@ -146,7 +146,10 @@ fun BrowseScreen(
                 progress = runningNow?.takeIf { it.workId == workId }?.progress,
                 inLibrary = inLibrary,
                 online = online,
-                onDownload = { scope.launch { queue.enqueue(workId) } },
+                onDownload = {
+                    val title = Ao3.workTitleFromPageTitle(webView.title)
+                    scope.launch { queue.enqueue(workId, title) }
+                },
                 onCancel = { onCancelDownload(workId) },
                 onRead = { onReadWork(workId) },
             )

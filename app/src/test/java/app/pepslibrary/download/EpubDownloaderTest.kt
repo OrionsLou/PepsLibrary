@@ -443,4 +443,37 @@ class EpubDownloaderTest {
 
         assertEquals(listOf<DownloadProgress>(DownloadProgress.LoadingPage), events)
     }
+
+    // --- the title on a failure ---
+
+    private val samplePage get() = checkNotNull(javaClass.getResource("/ao3/work_page_sample.html")).readText()
+
+    @Test
+    fun aFailureAfterTheWorkPageLoadedCarriesItsTitle() {
+        val result = failure(
+            downloader { request ->
+                if (request.url.encodedPath.startsWith("/works/")) request.reply(body = samplePage.toByteArray())
+                else request.reply(body = "<html>Shields are up!</html>".toByteArray(), type = "text/html")
+            }.download(workId),
+        )
+        assertEquals(FailureKind.NOT_AN_EPUB, result.kind)
+        assertEquals("Sample Work Title", result.title)
+    }
+
+    @Test
+    fun aDroppedConnectionAfterTheWorkPageLoadedCarriesItsTitle() {
+        val result = failure(
+            downloader { request ->
+                if (request.url.encodedPath.startsWith("/works/")) request.reply(body = samplePage.toByteArray())
+                else throw IOException("connection reset")
+            }.download(workId),
+        )
+        assertEquals(FailureKind.NETWORK, result.kind)
+        assertEquals("Sample Work Title", result.title)
+    }
+
+    @Test
+    fun aFailedWorkPageHasNoTitle() {
+        assertNull(failure(downloader { it.reply(code = 503) }.download(workId)).title)
+    }
 }
