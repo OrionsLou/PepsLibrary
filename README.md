@@ -31,7 +31,8 @@ in-app, download whole works as EPUBs, read them offline, and resume exactly whe
   While a download runs, the bar shows what it's doing (loading the work page, waiting for AO3 to prepare the file,
   then how much has arrived, with a progress bar). For a work already in the library it says "In your library"
   and offers **Read** and **Update**. While a page loads, a bar runs along the top and refresh becomes stop.
-- The **Downloads** button in the footer opens everything currently queued or failed, for a view across all
+- The **Download queue** button in the footer (an arrow into a tray, with a badge counting what's queued; the
+  arrow moves while a download runs) opens everything currently queued or failed, for a view across all
   works rather than just the one you're on, each listed by its title. A failed item can be retried or removed from there, and a
   download in progress can be cancelled from there or from the work's own page; cancelling never touches an existing
   copy. While offline the queue pauses (without using up its retries) and resumes by itself once reconnected.
@@ -42,7 +43,7 @@ in-app, download whole works as EPUBs, read them offline, and resume exactly whe
   live via Room). Scoped down from the original "already downloaded" badge plan: the data-layer check landed now,
   and the visible badge/button change on AO3's own pages is deferred to the Phase 3 UI polish pass rather than done
   as a one-off ahead of it.
-- The **Library** button in the footer opens Pep's Library: the downloaded works as shelf rows (title, authors,
+- The **Library** button in the footer (an open book) opens Pep's Library: the downloaded works as shelf rows (title, authors,
   fandoms, word and chapter counts with a complete/in progress status, summary, how far you've read with a thin
   progress line, and download date), with Pep sitting on the shelf above them. It slides over the browser, so the page
   and history you were on are kept. Downloading a work again replaces its entry. The trash icon on a work deletes

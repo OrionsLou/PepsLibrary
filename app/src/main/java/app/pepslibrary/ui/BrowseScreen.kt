@@ -156,6 +156,8 @@ fun BrowseScreen(
             )
         }
 
+        val queueCount by remember { queue.entries.map { it.size } }.collectAsState(initial = 0)
+        val downloadingAny = running.collectAsState().value != null
         BrowserToolbar(
             canGoBack = canGoBack,
             canGoForward = canGoForward,
@@ -164,6 +166,8 @@ fun BrowseScreen(
             loading = loading,
             onRefresh = ::refresh,
             onStop = ::stop,
+            queueCount = queueCount,
+            downloading = downloadingAny,
             onOpenQueue = onOpenQueue,
             onOpenLibrary = onOpenLibrary,
         )
