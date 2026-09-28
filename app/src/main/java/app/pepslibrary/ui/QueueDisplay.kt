@@ -31,9 +31,9 @@ internal fun queueRowTitle(entry: DownloadQueueEntity): String = entry.title ?: 
 /** While a work is downloading, its button is Cancel; otherwise (not queued, waiting, failed) it (re-)starts it. */
 internal fun queueShowsCancel(entry: DownloadQueueEntity?): Boolean = entry?.status == QueueStatus.IN_PROGRESS
 
-/** "Download EPUB" normally; "Retry download" once it's landed on FAILED, since tapping re-enqueues it. */
+/** "Save" normally; "Retry" once it's landed on FAILED, since tapping re-enqueues it. */
 internal fun queueButtonLabel(entry: DownloadQueueEntity?): String =
-    if (entry?.status == QueueStatus.FAILED) "Retry download" else "Download EPUB"
+    if (entry?.status == QueueStatus.FAILED) "Retry" else "Save"
 
 /** What a running download is doing, in words: the page, AO3 building the file, then how much has arrived. */
 internal fun downloadProgressLabel(progress: DownloadProgress): String = when (progress) {
