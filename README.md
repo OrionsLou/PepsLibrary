@@ -31,6 +31,8 @@ in-app, download whole works as EPUBs, read them offline, and resume exactly whe
 **Reading**
 - An offline EPUB reader ([Readium](https://readium.org) 3.1.2) that resumes exactly where you left off.
 - A bottom bar with a page slider and a chapter list, and Light, Sepia and Dark reading themes.
+- The screen stays on while you read: always (the default), for a set number of minutes after your last page turn,
+  or not at all, chosen in **Settings**.
 - Updating a work in progress keeps your place, even if earlier chapters were added or removed.
 - AO3 links in a book open in the app's browser, and Back returns to the book.
 

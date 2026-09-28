@@ -11,8 +11,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
@@ -25,6 +27,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -33,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -42,9 +46,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import app.pepslibrary.BuildConfig
 import app.pepslibrary.R
+import app.pepslibrary.settings.KeepScreenOn
 import app.pepslibrary.settings.ReadingTheme
 import app.pepslibrary.settings.ThemeMode
 
@@ -95,7 +102,8 @@ internal fun isDefaultLibraryView(order: LibraryOrder, filter: LibraryFilter): B
     order == LibraryOrder() && !filter.isActive
 
 /**
- * Everything that's saved, in one place: how the app and the reader look, the library's sort and filters, the
+ * Everything that's saved, in one place: how the app and the reader look, whether the reader keeps the screen on,
+ * the library's sort and filters, the
  * version, and a note from me behind the Meow button. Drawn over the library, which stays underneath.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -106,6 +114,8 @@ fun SettingsScreen(
     /** Null means the reader matches the app. */
     readingTheme: ReadingTheme?,
     onReadingTheme: (ReadingTheme?) -> Unit,
+    keepScreenOn: KeepScreenOn,
+    onKeepScreenOn: (KeepScreenOn) -> Unit,
     libraryOrder: LibraryOrder,
     libraryFilter: LibraryFilter,
     onResetLibraryView: () -> Unit,
@@ -163,6 +173,11 @@ fun SettingsScreen(
                 }
 
                 HorizontalDivider()
+                Section("Reader") {
+                    KeepScreenOnSetting(keepScreenOn, onKeepScreenOn)
+                }
+
+                HorizontalDivider()
                 Section("Library") {
                     libraryViewSummary(libraryOrder, libraryFilter).forEach {
                         Text(it, style = MaterialTheme.typography.bodyMedium)
@@ -193,6 +208,90 @@ fun SettingsScreen(
             }
         }
     }
+}
+
+/** The three kinds of [KeepScreenOn], for the segmented choice. */
+private enum class KeepScreenOnKind(val label: String) { ALWAYS("Always"), TIMED("Timed"), OFF("Off") }
+
+/**
+ * "Keep the screen on" while reading: Always, Timed (for a number of whole minutes after the last touch) or Off. The
+ * minutes are typed or stepped with − and +; a value that isn't a whole number in range isn't saved, and the field
+ * says why.
+ */
+@Composable
+private fun KeepScreenOnSetting(setting: KeepScreenOn, onChange: (KeepScreenOn) -> Unit) {
+    // Remembered across switching kinds, so going Timed → Always → Timed keeps the chosen minutes.
+    var minutes by rememberSaveable { mutableIntStateOf((setting as? KeepScreenOn.Timed)?.minutes ?: KeepScreenOn.DEFAULT_MINUTES) }
+    var typed by rememberSaveable { mutableStateOf(minutes.toString()) }
+    fun setMinutes(value: Int) {
+        minutes = KeepScreenOn.clampMinutes(value)
+        typed = minutes.toString()
+        onChange(KeepScreenOn.Timed(minutes))
+    }
+
+    Text("Keep the screen on", style = MaterialTheme.typography.bodyMedium)
+    Choices(
+        options = KeepScreenOnKind.entries,
+        selected = when (setting) {
+            KeepScreenOn.Always -> KeepScreenOnKind.ALWAYS
+            is KeepScreenOn.Timed -> KeepScreenOnKind.TIMED
+            KeepScreenOn.Off -> KeepScreenOnKind.OFF
+        },
+        label = { it.label },
+        onSelect = { kind ->
+            onChange(
+                when (kind) {
+                    KeepScreenOnKind.ALWAYS -> KeepScreenOn.Always
+                    KeepScreenOnKind.TIMED -> KeepScreenOn.Timed(minutes)
+                    KeepScreenOnKind.OFF -> KeepScreenOn.Off
+                },
+            )
+        },
+    )
+    if (setting is KeepScreenOn.Timed) {
+        val valid = KeepScreenOn.parseMinutes(typed) != null
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            IconButton(onClick = { setMinutes(minutes - 1) }, enabled = minutes > KeepScreenOn.MIN_MINUTES) {
+                Text("−", style = MaterialTheme.typography.titleLarge)
+            }
+            OutlinedTextField(
+                value = typed,
+                onValueChange = { text ->
+                    typed = text.filter(Char::isDigit).take(3)
+                    KeepScreenOn.parseMinutes(typed)?.let {
+                        minutes = it
+                        onChange(KeepScreenOn.Timed(it))
+                    }
+                },
+                singleLine = true,
+                isError = !valid,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                suffix = { Text("min") },
+                modifier = Modifier.width(112.dp),
+            )
+            IconButton(onClick = { setMinutes(minutes + 1) }, enabled = minutes < KeepScreenOn.MAX_MINUTES) {
+                Text("+", style = MaterialTheme.typography.titleLarge)
+            }
+        }
+    }
+    Text(
+        when (setting) {
+            KeepScreenOn.Always -> "The screen stays on for as long as the reader is open."
+            is KeepScreenOn.Timed -> if (KeepScreenOn.parseMinutes(typed) != null) {
+                "The screen stays on for ${setting.minutes} ${if (setting.minutes == 1) "minute" else "minutes"} after " +
+                    "your last page turn or tap, then sleeps as usual."
+            } else {
+                "Enter whole minutes from ${KeepScreenOn.MIN_MINUTES} to ${KeepScreenOn.MAX_MINUTES}."
+            }
+            KeepScreenOn.Off -> "The screen sleeps on the phone's usual timer."
+        },
+        style = MaterialTheme.typography.bodySmall,
+        color = if (setting is KeepScreenOn.Timed && KeepScreenOn.parseMinutes(typed) == null) {
+            MaterialTheme.colorScheme.error
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+    )
 }
 
 @Composable
