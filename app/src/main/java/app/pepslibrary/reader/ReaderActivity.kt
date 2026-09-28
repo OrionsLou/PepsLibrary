@@ -72,6 +72,7 @@ import androidx.fragment.app.FragmentContainerView
 import androidx.fragment.app.commitNow
 import androidx.lifecycle.lifecycleScope
 import app.pepslibrary.AppScope
+import app.pepslibrary.MainActivity
 import app.pepslibrary.data.AppDatabase
 import app.pepslibrary.data.DownloadQueueRepository
 import app.pepslibrary.data.LibraryRepository
@@ -79,7 +80,8 @@ import app.pepslibrary.data.PositionNotice
 import app.pepslibrary.data.ReadingProgressRepository
 import app.pepslibrary.settings.AppSettings
 import app.pepslibrary.settings.ReadingTheme
-import app.pepslibrary.ui.isOpenableExternally
+import app.pepslibrary.ui.BookLinkTarget
+import app.pepslibrary.ui.bookLinkTarget
 import app.pepslibrary.ui.theme.PepsTheme
 import app.pepslibrary.ui.theme.pageColors
 import java.io.File
@@ -363,16 +365,27 @@ class ReaderActivity : FragmentActivity() {
         publication?.close()
     }
 
-    /** Links inside a book (for example back to the work on AO3) open in the browser, never inside the reader. */
+    /**
+     * Links inside a book never open inside the reader. An AO3 link (for example back to the work, or its comments)
+     * closes the reader and opens in the app's own browser, where you're signed in; the position is saved as the
+     * reader stops, as when leaving any other way, and Back on that page reopens the book there. Other web links
+     * open in the phone's browser.
+     */
     @OptIn(ExperimentalReadiumApi::class)
     private val navigatorListener = object : EpubNavigatorFragment.Listener {
         override fun onExternalLinkActivated(url: AbsoluteUrl) {
-            val uri = android.net.Uri.parse(url.toString())
-            if (!isOpenableExternally(uri.scheme)) return
-            try {
-                startActivity(Intent(Intent.ACTION_VIEW, uri))
-            } catch (e: android.content.ActivityNotFoundException) {
-                Log.w(TAG, "No app to open $uri")
+            val link = url.toString()
+            when (bookLinkTarget(link)) {
+                BookLinkTarget.IN_APP -> {
+                    startActivity(MainActivity.openUrlIntent(this@ReaderActivity, link, fromWorkId = workId))
+                    finish()
+                }
+                BookLinkTarget.EXTERNAL -> try {
+                    startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(link)))
+                } catch (e: android.content.ActivityNotFoundException) {
+                    Log.w(TAG, "No app to open $link")
+                }
+                BookLinkTarget.IGNORE -> Unit
             }
         }
     }

@@ -57,9 +57,10 @@ in-app, download whole works as EPUBs, read them offline, and resume exactly whe
   (version 3.1.2): swipe or tap the page edges to turn pages, with the title and percent read in a top bar. The
   reading position is saved (as a Readium locator, in Room) when you leave, when the app is stopped, and a second
   after you stop turning pages, so even a killed app resumes at the same spot. Each library entry shows "Not
-  started", "Opened, not started", "42% read" or "Finished". Links inside a book open in the browser, never inside
-  the reader. A missing or damaged file gets a clear message instead of a crash, with buttons to download the work
-  again or go back to the library.
+  started", "Opened, not started", "42% read" or "Finished". Links inside a book never open inside the reader: an
+  AO3 link closes the reader and opens in the app's own browser (Back returns to the book), and any other link opens
+  in the phone's browser. A missing or damaged file gets a clear message instead of a crash, with buttons to
+  download the work again or go back to the library.
 - The reader has a bottom bar for moving around a work: a slider that steps page by page with a chapter and
   percent preview, and a **Chapters** list that jumps to any chapter. Tap the middle of the page to show or hide it.
 - Three reading themes, Light, Sepia and Dark, switched by a button in that bar (each tap moves to the next). The

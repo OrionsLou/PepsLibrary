@@ -39,7 +39,11 @@ import java.io.File
 
 /** The browser is always composed; the other screens slide over it, so the WebView keeps its page and history. */
 @Composable
-fun PepsLibraryApp() {
+fun PepsLibraryApp(
+    /** An AO3 page to open in the browser (a link tapped in the reader), or null. */
+    openLink: LinkFromBook? = null,
+    onLinkOpened: () -> Unit = {},
+) {
     val context = LocalContext.current
     val database = remember { AppDatabase.get(context) }
     val worksDir = remember { File(context.filesDir, "works") }
@@ -85,6 +89,15 @@ fun PepsLibraryApp() {
     // Cancel and Remove are one action: the processor stops the work if it's running, then takes it off the queue.
     val cancelDownload: (Long) -> Unit = { workId -> scope.launch { processor.cancel(workId) } }
 
+    // A link from the reader shows the browser, so close anything drawn over it.
+    LaunchedEffect(openLink) {
+        if (openLink != null) {
+            showSettings = false
+            showLibrary = false
+            showQueue = false
+        }
+    }
+
     Box(Modifier.fillMaxSize()) {
         BrowseScreen(
             queue = queue,
@@ -94,6 +107,8 @@ fun PepsLibraryApp() {
             onReadWork = { workId -> context.startActivity(ReaderActivity.intent(context, workId)) },
             onOpenQueue = { showQueue = true },
             onOpenLibrary = { showLibrary = true },
+            openLink = openLink,
+            onLinkOpened = onLinkOpened,
         )
 
         OverlayScreen(visible = showQueue, onBack = { showQueue = false }) {

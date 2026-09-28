@@ -78,6 +78,9 @@ fun BrowseScreen(
     onReadWork: (workId: Long) -> Unit,
     onOpenQueue: () -> Unit,
     onOpenLibrary: () -> Unit,
+    /** An AO3 page to load (a link tapped in the reader); [onLinkOpened] is called once it's been handed to the page. */
+    openLink: LinkFromBook? = null,
+    onLinkOpened: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -86,6 +89,9 @@ fun BrowseScreen(
     var canGoForward by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var currentUrl by remember { mutableStateOf<String?>(null) }
+    var historyIndex by remember { mutableIntStateOf(0) }
+    // Set while a page opened from a book is in the history: Back on that page reopens the book.
+    var returnToReader by remember { mutableStateOf<ReturnToReader?>(null) }
     val scope = rememberCoroutineScope()
     val online by remember { NetworkMonitor.get(context).isOnline }.collectAsState()
 
@@ -93,7 +99,13 @@ fun BrowseScreen(
         createWebView(
             context = context,
             onProgress = { progress = it },
-            onHistoryChanged = { back, forward, url -> canGoBack = back; canGoForward = forward; currentUrl = url },
+            onHistoryChanged = { back, forward, url, index ->
+                canGoBack = back
+                canGoForward = forward
+                currentUrl = url
+                historyIndex = index
+                returnToReader?.onHistory(index)
+            },
             onPageStarted = { error = null },
             onError = { error = it },
         ).also { it.loadUrl(Ao3.HOME_URL) }
@@ -102,7 +114,18 @@ fun BrowseScreen(
 
     val workId = Ao3.workIdFromUrl(currentUrl)
 
-    fun goBack() { error = null; webView.goBack() }
+    val backToReader = returnToReader?.appliesAt(historyIndex) == true
+    fun goBack() {
+        error = null
+        val reader = returnToReader
+        if (reader != null && reader.appliesAt(historyIndex)) {
+            // Once back in the book, this page's Back is ordinary history again.
+            returnToReader = null
+            onReadWork(reader.workId)
+        } else {
+            webView.goBack()
+        }
+    }
     fun goForward() { error = null; webView.goForward() }
     fun refresh() {
         error = null
@@ -114,7 +137,18 @@ fun BrowseScreen(
         progress = 100 // a stopped load doesn't always report reaching the end
     }
 
-    BackHandler(enabled = canGoBack) { goBack() }
+    BackHandler(enabled = canGoBack || backToReader) { goBack() }
+
+    // Loaded like any page you navigate to, noting the book it came from: Back on it reopens that book, and pages
+    // followed from it go back through history as usual until they reach it again.
+    LaunchedEffect(openLink) {
+        openLink?.let {
+            error = null
+            returnToReader = ReturnToReader(it.workId)
+            webView.loadUrl(it.url)
+            onLinkOpened()
+        }
+    }
 
     // A page that failed while offline reloads by itself once the connection is back; nothing else is retried.
     LaunchedEffect(online) {
@@ -167,7 +201,7 @@ fun BrowseScreen(
         val queueCount by remember { queue.entries.map { it.size } }.collectAsState(initial = 0)
         val downloadingAny = running.collectAsState().value != null
         BrowserToolbar(
-            canGoBack = canGoBack,
+            canGoBack = canGoBack || backToReader,
             canGoForward = canGoForward,
             onBack = ::goBack,
             onForward = ::goForward,
@@ -320,7 +354,7 @@ private fun OfflineOverlay(onOpenLibrary: () -> Unit, onRetry: () -> Unit) {
 private fun createWebView(
     context: Context,
     onProgress: (Int) -> Unit,
-    onHistoryChanged: (canGoBack: Boolean, canGoForward: Boolean, url: String?) -> Unit,
+    onHistoryChanged: (canGoBack: Boolean, canGoForward: Boolean, url: String?, index: Int) -> Unit,
     onPageStarted: () -> Unit,
     onError: (String) -> Unit,
 ): WebView = WebView(context).apply {
@@ -358,7 +392,7 @@ private fun createWebView(
         }
 
         override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) =
-            onHistoryChanged(view.canGoBack(), view.canGoForward(), url)
+            onHistoryChanged(view.canGoBack(), view.canGoForward(), url, view.copyBackForwardList().currentIndex)
 
         override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
             if (request.isForMainFrame) onError(error.description.toString())
