@@ -58,6 +58,16 @@ class AppSettings private constructor(context: Context) {
         readingThemeState.value = theme
     }
 
+    private val keepScreenOnState = MutableStateFlow(KeepScreenOn.fromSaved(prefs.getString(KEEP_SCREEN_ON, null)))
+
+    /** Whether the reader keeps the screen from sleeping; always on until changed. */
+    val keepScreenOn: StateFlow<KeepScreenOn> = keepScreenOnState.asStateFlow()
+
+    fun setKeepScreenOn(setting: KeepScreenOn) {
+        prefs.edit().putString(KEEP_SCREEN_ON, setting.toSaved()).apply()
+        keepScreenOnState.value = setting
+    }
+
     fun setThemeMode(mode: ThemeMode) {
         prefs.edit().putString(THEME_MODE, mode.name).apply()
         themeModeState.value = mode
@@ -66,6 +76,7 @@ class AppSettings private constructor(context: Context) {
     companion object {
         private const val THEME_MODE = "themeMode"
         private const val READING_THEME = "readingTheme"
+        private const val KEEP_SCREEN_ON = "keepScreenOn"
 
         @Volatile private var instance: AppSettings? = null
 

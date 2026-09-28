@@ -5,7 +5,9 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
 import android.util.Log
+import android.view.MotionEvent
 import android.view.View
+import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.slideInVertically
@@ -79,6 +81,7 @@ import app.pepslibrary.data.LibraryRepository
 import app.pepslibrary.data.PositionNotice
 import app.pepslibrary.data.ReadingProgressRepository
 import app.pepslibrary.settings.AppSettings
+import app.pepslibrary.settings.KeepScreenOn
 import app.pepslibrary.settings.ReadingTheme
 import app.pepslibrary.ui.BookLinkTarget
 import app.pepslibrary.ui.bookLinkTarget
@@ -87,6 +90,8 @@ import app.pepslibrary.ui.theme.pageColors
 import java.io.File
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.debounce
@@ -138,6 +143,7 @@ class ReaderActivity : FragmentActivity() {
     private var showChapters by mutableStateOf(false)
     private var readingTheme by mutableStateOf(ReadingTheme.LIGHT)
     private lateinit var settings: AppSettings
+    private var keepScreenOn: KeepScreenOn = KeepScreenOn.DEFAULT
 
     private var workId = -1L
     private var publication: Publication? = null
@@ -353,6 +359,47 @@ class ReaderActivity : FragmentActivity() {
         val json = locator.toJSON().toString()
         val total = locator.locations.totalProgression
         AppScope.launch { progress.save(workId, json, total) }
+    }
+
+    /** Ends the Timed keep-screen-on wait; restarted by every touch. */
+    private var screenOnTimeout: Job? = null
+
+    override fun onResume() {
+        super.onResume()
+        // Read each time the reader comes to the front, so a change made in Settings applies to the next book.
+        keepScreenOn = settings.keepScreenOn.value
+        holdScreenOn()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        screenOnTimeout?.cancel()
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
+
+    /** Any touch counts as reading: a page turn, a tap, the bottom bar. */
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN) holdScreenOn()
+        return super.dispatchTouchEvent(ev)
+    }
+
+    /**
+     * Applies the keep-screen-on setting: Always holds the screen on while the reader shows, Off leaves the phone's
+     * own timer, and Timed holds it for the chosen minutes from now, after which the phone's timer takes over.
+     */
+    private fun holdScreenOn() {
+        screenOnTimeout?.cancel()
+        when (val setting = keepScreenOn) {
+            KeepScreenOn.Always -> window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            KeepScreenOn.Off -> window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            is KeepScreenOn.Timed -> {
+                window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                screenOnTimeout = lifecycleScope.launch {
+                    delay(setting.minutes * 60_000L)
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                }
+            }
+        }
     }
 
     override fun onStop() {

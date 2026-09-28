@@ -155,11 +155,14 @@ fun PepsLibraryApp(
             val settings = remember { AppSettings.get(context) }
             val themeMode by settings.themeMode.collectAsState()
             val readingTheme by settings.readingTheme.collectAsState()
+            val keepScreenOn by settings.keepScreenOn.collectAsState()
             SettingsScreen(
                 themeMode = themeMode,
                 onThemeMode = settings::setThemeMode,
                 readingTheme = readingTheme,
                 onReadingTheme = settings::setReadingTheme,
+                keepScreenOn = keepScreenOn,
+                onKeepScreenOn = settings::setKeepScreenOn,
                 libraryOrder = LibraryOrder(librarySort, librarySortReversed),
                 libraryFilter = libraryFilter,
                 onResetLibraryView = {
