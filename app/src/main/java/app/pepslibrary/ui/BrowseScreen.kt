@@ -20,12 +20,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -43,6 +45,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -55,6 +59,7 @@ import app.pepslibrary.data.QueueStatus
 import app.pepslibrary.download.DownloadProgress
 import app.pepslibrary.download.RunningDownload
 import app.pepslibrary.network.NetworkMonitor
+import app.pepslibrary.ui.theme.PepsPalette
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -118,9 +123,12 @@ fun BrowseScreen(
 
     Column(modifier.fillMaxSize()) {
         Box(Modifier.fillMaxWidth().weight(1f)) {
-            AndroidView(factory = { webView }, modifier = Modifier.fillMaxSize())
-
-            if (loading) PageLoadBar(progress, Modifier.align(Alignment.TopStart))
+            // The loading bar has a strip of its own above the page rather than being drawn over it, where it sat
+            // against AO3's header. The strip stays when nothing is loading, so the page doesn't jump on each load.
+            Column(Modifier.fillMaxSize()) {
+                PageLoadStrip(loading, progress)
+                AndroidView(factory = { webView }, modifier = Modifier.fillMaxWidth().weight(1f))
+            }
 
             error?.let { message ->
                 if (online) {
@@ -242,12 +250,32 @@ private fun DownloadBar(
     }
 }
 
-/** Shows how far a page has loaded as a clear accent bar along the top; it starts at a tenth so it's seen at once. */
+/**
+ * The white strip above the page, holding a thick accent bar while a page loads, with a white gap below it. The bar
+ * has two layers: underneath, segments that keep moving (like a download whose size isn't known) so it's plain the
+ * page is still working even when progress stalls; on top, a solid fill showing how far it has got, starting at a tenth
+ * so it's seen at once. White, like AO3's page, in either app theme.
+ */
 @Composable
-private fun PageLoadBar(progress: Int, modifier: Modifier = Modifier) {
-    val shown by animateFloatAsState((progress.coerceIn(10, 100)) / 100f, label = "pageLoad")
-    Box(modifier.fillMaxWidth().height(3.dp)) {
-        Box(Modifier.fillMaxWidth(shown).fillMaxHeight().background(MaterialTheme.colorScheme.primary))
+private fun PageLoadStrip(loading: Boolean, progress: Int, modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxWidth().background(Color.White)) {
+        Box(Modifier.fillMaxWidth().height(5.dp)) {
+            if (loading) {
+                val shown by animateFloatAsState((progress.coerceIn(10, 100)) / 100f, label = "pageLoad")
+                // Always the light theme's deeper green: the page below stays light in either app theme, and the
+                // dark theme's pale green all but vanished against it.
+                val accent = PepsPalette.Light.eye
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxSize(),
+                    color = accent.copy(alpha = 0.45f),
+                    trackColor = accent.copy(alpha = 0.15f),
+                    gapSize = 0.dp,
+                    strokeCap = StrokeCap.Butt,
+                )
+                Box(Modifier.fillMaxWidth(shown).fillMaxHeight().background(accent))
+            }
+        }
+        Spacer(Modifier.height(4.dp))
     }
 }
 
