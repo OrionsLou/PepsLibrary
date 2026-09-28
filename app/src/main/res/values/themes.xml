@@ -1,3 +1,9 @@
 <resources>
-    <style name="Theme.PepsLibrary" parent="android:Theme.Material.Light.NoActionBar" />
+    <!--
+        Light parent here, dark in values-night: the window follows the phone's setting until Compose draws, then
+        PepsTheme applies the in-app choice (which may override it).
+    -->
+    <style name="Theme.PepsLibrary" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/coat</item>
+    </style>
 </resources>

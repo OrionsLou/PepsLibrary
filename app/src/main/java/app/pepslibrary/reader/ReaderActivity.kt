@@ -68,6 +68,7 @@ import androidx.lifecycle.lifecycleScope
 import app.pepslibrary.AppScope
 import app.pepslibrary.data.DownloadQueueRepository
 import app.pepslibrary.data.AppDatabase
+import app.pepslibrary.ui.theme.PepsTheme
 import app.pepslibrary.data.LibraryRepository
 import app.pepslibrary.data.PositionNotice
 import app.pepslibrary.data.ReadingProgressRepository
@@ -142,7 +143,7 @@ class ReaderActivity : FragmentActivity() {
         progress = ReadingProgressRepository(db.readingProgressDao())
 
         setContent {
-            MaterialTheme {
+            PepsTheme {
                 Surface(Modifier.fillMaxSize()) {
                     Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                         ReaderBar(title = workTitle, percent = percentRead, onClose = ::finish)

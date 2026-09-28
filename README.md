@@ -10,6 +10,9 @@ in-app, download whole works as EPUBs, read them offline, and resume exactly whe
 ## What works today
 
 - Signed release build that installs on a device by sideloading.
+- Light and dark themes in a grey-tabby palette, following the phone's setting (an in-app override is stored,
+  with its control coming in a later step), so the status bar's icons are always visible. Titles use the Literata
+  typeface.
 - AO3 loads in a `WebView` with the site's full search, filters and bookmarks. Signing in works and the session
   cookies persist.
 - Navigation stays on AO3: links to other sites open in the system browser.
