@@ -1,0 +1,80 @@
+# Demonstration CD pipeline. It shows the stages a real release flow has (verify, build, package, publish) but is
+# deliberately inert: it builds an UNSIGNED APK, never touches a signing key, and the publish stage only prints what it
+# would do. Real releases are built locally and installed over adb (see HANDOFF.md, step 11).
+name: CD (demo)
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify tag matches app version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: version
+        run: |
+          version=$(grep -oP 'val appVersion = "\K[^"]+' app/build.gradle.kts)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "appVersion in app/build.gradle.kts: $version"
+
+      # A manual run has no tag to compare against.
+      - name: Check tag
+        if: github.ref_type == 'tag'
+        run: |
+          if [ "${GITHUB_REF_NAME}" != "v${{ steps.version.outputs.version }}" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match appVersion v${{ steps.version.outputs.version }}"
+            exit 1
+          fi
+
+  build:
+    name: Build release APK (unsigned)
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      # Same gate as CI, so a tag can't ship something the PR checks would have rejected.
+      - name: Unit tests
+        run: ./gradlew testDebugUnitTest
+
+      # No keystore exists on the runner, so Gradle produces app-release-unsigned.apk, which can't be installed.
+      - name: Assemble release
+        run: ./gradlew assembleRelease
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pepslibrary-${{ needs.verify.outputs.version }}-unsigned
+          path: app/build/outputs/apk/release/app-release-unsigned.apk
+          retention-days: 7
+          if-no-files-found: error
+
+  publish:
+    name: Publish (dry run)
+    needs: [verify, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Show what a real release would do
+        run: |
+          echo "Would sign app-release-unsigned.apk with the release keystore (from repository secrets)."
+          echo "Would create GitHub Release v${{ needs.verify.outputs.version }} and attach the signed APK."
+          echo "Skipped: this repo does not publish APKs (decided 2026-09-27)."
