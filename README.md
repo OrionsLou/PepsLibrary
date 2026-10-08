@@ -118,6 +118,15 @@ written plan rather than ad-hoc prompting:
 
 Commits made with the agent's help carry a `Co-Authored-By` trailer, so the history shows what it touched.
 
+## CI/CD
+
+- **CI** (`.github/workflows/ci.yml`) runs Android Lint and the unit tests on every pull request and on pushes to
+  `develop`.
+- **CD** (`.github/workflows/cd.yml`) is a demonstration. Pushing a `v*` tag checks the tag against `appVersion`,
+  runs the unit tests, builds an *unsigned* release APK as a short-lived workflow artifact, and ends with a dry-run
+  publish job that only prints what a real release would do. It uses no secrets and publishes nothing, because this
+  project doesn't distribute APKs (see below).
+
 ## Building
 
 **There are no prebuilt APKs or GitHub Releases.** This is a personal project, so it's distributed as source only:
