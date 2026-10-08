@@ -51,6 +51,9 @@ $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
 
 - One change per branch (`feature/...` or `chore/...`), off an up-to-date `develop`. I push, open the PR and merge
   myself; don't push unless asked. If the branch is missing something that isn't merged yet, stop and say so.
+- Keep commits small and focused: one logical change each, easy to review on its own. When a task is larger than
+  that, split it into several PRs (each on its own branch, each leaving the build green) rather than one big one, and
+  propose the split before starting.
 - Each change: unit tests → debug build on the emulator (golden path and edge cases, screenshots, light and dark) →
   signed release APK for my phone test → commit when I say so.
 - A change carrying a new feature bumps `appVersion` in `app/build.gradle.kts` (patch by default); `versionCode`
