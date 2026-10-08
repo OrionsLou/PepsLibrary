@@ -15,6 +15,8 @@ $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
 ```
 
 - Unit tests (JVM, no device): `.\gradlew.bat testDebugUnitTest`
+- Lint: `.\gradlew.bat lintDebug`. CI (`.github/workflows/ci.yml`) runs lint and the unit tests on every PR and on
+  pushes to `develop`; run both locally before pushing.
 - Debug build: `.\gradlew.bat assembleDebug` → `app\build\outputs\apk\debug\app-debug.apk`
 - Signed release build: `.\gradlew.bat assembleRelease` → `app\build\outputs\apk\release\app-release.apk`
   (`app-release-unsigned.apk` means the keystore properties weren't found; it won't install)

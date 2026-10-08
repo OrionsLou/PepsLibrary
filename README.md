@@ -161,6 +161,9 @@ Use the same `JAVA_HOME` as above:
 `.\gradlew.bat test` runs the debug and release variants. HTML results are written to
 `app/build/reports/tests/testDebugUnitTest/index.html`.
 
+Lint is Android Lint (`.\gradlew.bat lintDebug`). GitHub Actions runs lint and the unit tests on every pull request
+and on pushes to `develop` (`.github/workflows/ci.yml`); the lint and test reports are attached to each run.
+
 ## Release signing
 
 The keystore and its passwords are **never committed**, and are kept outside the repo (and outside OneDrive).
